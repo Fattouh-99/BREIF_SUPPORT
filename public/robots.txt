@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Allow favicon and icon files
+Allow: /favicon.ico
+Allow: /favicon_io/
+Allow: /icons/
+
+# Disallow admin routes
+Disallow: /admin-setup
+Disallow: /admin-setup/*
+
+# Sitemap
+Sitemap: https://www.briefsupport.com/sitemap.xml

@@ -1,0 +1,8 @@
+'use client'
+
+import React from 'react'
+
+// Empty page to prevent build errors
+export default function AdminApplicationsPage() {
+  return null
+} 

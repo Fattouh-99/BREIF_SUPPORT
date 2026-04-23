@@ -1,0 +1,27 @@
+{
+  "name": "Brief Support - AI-Powered Sales Assistant",
+  "short_name": "Brief Support",
+  "description": "Transform your website with our AI-powered sales assistant. Boost conversion rates up to 50% with 24/7 customer support.",
+  "icons": [
+    {
+      "src": "/favicon_io/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon_io/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/Icon-Only-Color.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#6366f1",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/"
+}

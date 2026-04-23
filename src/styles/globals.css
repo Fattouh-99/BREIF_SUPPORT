@@ -1,0 +1,4 @@
+/* Add global style fix for Next.js Image components */
+img[height][width] {
+  height: auto;
+} 

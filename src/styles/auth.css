@@ -1,0 +1,57 @@
+/* Fix for mobile viewport height issues */
+html, body {
+  height: 100%;
+  min-height: 100%;
+  overscroll-behavior: none;
+}
+
+/* This ensures content doesn't shift when virtual keyboard appears on mobile */
+@media screen and (max-width: 767px) {
+  .auth-container {
+    height: 100%;
+    min-height: -webkit-fill-available;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .auth-form-container {
+    flex: 1;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  
+  /* Fix for iOS Safari 100vh issue */
+  @supports (-webkit-touch-callout: none) {
+    .auth-container {
+      min-height: -webkit-fill-available;
+    }
+  }
+}
+
+/* Add extra padding for bottom-mounted home indicators on newer phones */
+.has-home-indicator {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Fix for when virtual keyboard is open */
+.is-keyboard-open {
+  height: auto;
+  min-height: auto;
+}
+
+/* Improved form inputs for mobile */
+@media screen and (max-width: 767px) {
+  .form-input {
+    font-size: 16px; /* Prevents auto-zoom on iOS */
+    padding: 12px;
+    height: 48px;
+  }
+  
+  .form-button {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    min-height: 48px;
+  }
+} 

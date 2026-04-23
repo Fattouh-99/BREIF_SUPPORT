@@ -1,0 +1,709 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["extendedWhereUnique"]
+}
+
+datasource db {
+  provider = "postgresql"
+  // Fallback URL for development and build purposes
+  url      = env("DATABASE_URL") // postgresql://neondb_owner:Ez6KkiShr8VA@ep-quiet-recipe-a2qlzpkw.eu-central-1.aws.neon.tech/neondb?sslmode=require
+}
+
+model User {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullname            String
+  clerkId             String            @unique
+  email               String            @unique
+  products            String[]          // Consider normalization in future versions
+  categories          String[]          // Consider normalization in future versions
+  targetAudience      String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  stripeId            String?
+  role                UserRole          @default(MEMBER)
+  teamId              String?           @db.Uuid
+  campaign            Campaign[]
+  assignedChats       ChatRoom[]        @relation("AssignedChats")
+  sharedChats         ChatRoom[]        @relation("SharedByUser")
+  domains             Domain[]
+  notifications       Notification[]
+  subscription        Billings?
+  payments            Payment[]         // Add payment relation
+  systemSettings      SystemSettings[]
+  ownedTeams          Team[]            @relation("TeamOwner")
+  receivedInvitations TeamInvitation[]  @relation("ReceivedInvitations")
+  sentInvitations     TeamInvitation[]  @relation("SentInvitations")
+  sentTransfers       TransferRequest[] @relation("FromUser")
+  receivedTransfers   TransferRequest[] @relation("ToUser")
+  team                Team?             @relation(fields: [teamId], references: [id])
+  sharedChatRooms     ChatRoom[]        @relation("SharedChatRooms")
+  devices             UserDevice[]
+  jobs                Job[]             // Relation to jobs created by user
+  blogPosts           BlogPost[]        // Relation to blog posts authored by user
+  imageUrl            String?
+
+  @@index([teamId])
+  @@index([email])
+  @@index([role])
+  @@index([clerkId])
+  @@map("users")
+}
+
+model UserDevice {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  fingerprint  String
+  userAgent    String?
+  ipAddress    String?  @db.VarChar(45) // IPv6 addresses can be up to 45 chars
+  firstSeen    DateTime @default(now())
+  lastSeen     DateTime @updatedAt
+  isBlocked    Boolean  @default(false)
+  blockedReason String?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, fingerprint])
+  @@index([userId])
+  @@index([fingerprint])
+  @@index([isBlocked])
+}
+
+model Domain {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String              @db.VarChar(255)
+  icon            String
+  userId          String?             @db.Uuid
+  campaignId      String?             @db.Uuid
+  teamId          String?             @db.Uuid
+  permissions     Json?
+  bookings        Bookings[]
+  chatBot         ChatBot?
+  customer        Customer[]
+  Campaign        Campaign?           @relation(fields: [campaignId], references: [id])
+  team            Team?               @relation(fields: [teamId], references: [id])
+  User            User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  filterQuestions FilterQuestions[]
+  helpdesk        HelpDesk[]
+  notifications   Notification[]
+  products        Product[]
+  helpDeskFeedback HelpDeskFeedback[]
+
+  @@index([teamId])
+  @@index([userId])
+  @@index([campaignId])
+  @@index([name])
+}
+
+model ChatBot {
+  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  welcomeMessage        String?
+  icon                  String?
+  iconColor             String?      @default("#6366F1")
+  iconStyle             String?      @default("Default")
+  background            String?
+  textColor             String?
+  themeColor            String?      @default("#f3f4f6")
+  helpDeskColor         String?      @default("#f3f4f6")
+  titleColor            String?      @default("#1F2937")
+  bubbleBackground      String?
+  homeTitle             String?      @default("Welcome to Support")
+  homeLayout            String?      @default("classic")
+  helpdesk              Boolean      @default(false)
+  paymentEnabled        Boolean      @default(false)
+  chatbotEnabled        Boolean      @default(true)
+  inquiryMode           Boolean      @default(false)
+  productsEnabled       Boolean      @default(true)
+  customLinksEnabled    Boolean      @default(false)
+  popularTopicsEnabled  Boolean      @default(true)
+  popularTopics         String?      @db.Text
+  customLinkTitle       String?
+  customLinkDescription String?
+  customLinkUrl         String?
+  
+  // Feedback Configuration
+  feedbackEnabled       Boolean      @default(true)
+  feedbackQuestion      String       @default("Was this helpful?")
+  feedbackYesText       String       @default("👍 Yes")
+  feedbackNoText        String       @default("👎 No")
+  feedbackFollowUp      String       @default("Still need help? Start a conversation")
+  
+  domainId              String?      @unique @db.Uuid
+  businessDescription   String?      @db.Text
+  handoffPreference     String?
+  industry              String?
+  personality           String?
+  responseStyle         String?
+  tone                  String?
+  freeShippingThreshold Decimal?     @db.Decimal(10, 2)
+  shippingCosts         Json?
+  shippingEnabled       Boolean      @default(false)
+  shippingRegions       String[]     @default([])
+  shippingTime          String?
+  Domain                Domain?      @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  customLinks           CustomLink[]
+}
+
+model CustomLink {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String   @db.VarChar(255)
+  description String?  @db.Text
+  url         String   @db.VarChar(2048)
+  chatBotId   String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  chatBot     ChatBot  @relation(fields: [chatBotId], references: [id], onDelete: Cascade)
+
+  @@index([chatBotId])
+}
+
+model Billings {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plan                 String    @default("STANDARD")
+  credits              Int       @default(10)
+  chatRequests         Int       @default(0)      // Requests used in current billing period
+  lastChatReset        DateTime  @default(now())  // Timestamp of last monthly reset
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  status               String?   @default("active")
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  userId               String?   @unique @db.Uuid
+  User                 User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeSubscriptionId])
+  @@map("Subscription")
+}
+
+model HelpDesk {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String              @default("") @db.VarChar(255)
+  question    String              @db.Text
+  answer      String              @db.Text
+  content     String?             @db.Text  // Rich HTML content for the article
+  articleType String              @default("faq") // 'faq', 'article', 'guide'
+  category    String?             @db.VarChar(100)
+  tags        String[]            @default([])
+  isPublished Boolean             @default(true)
+  isPinned    Boolean             @default(false)
+  viewCount   Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @default(now()) @updatedAt
+  domainId    String?             @db.Uuid
+  Domain      Domain?             @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  feedback    HelpDeskFeedback[]
+
+  @@index([domainId])
+  @@index([articleType])
+  @@index([category])
+  @@index([isPublished])
+  @@index([isPinned])
+}
+
+model FilterQuestions {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question String  @db.Text
+  answered String? @db.Text
+  domainId String? @db.Uuid
+  Domain   Domain? @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([domainId])
+}
+
+model CustomerResponses {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question   String   @db.Text
+  answered   String?  @db.Text
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model Customer {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String?             @db.VarChar(255)
+  domainId  String?             @db.Uuid
+  createdAt DateTime            @default(now())
+  booking   Bookings[]
+  chatRoom  ChatRoom[]
+  Domain    Domain?             @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  questions CustomerResponses[]
+
+  @@index([email])
+  @@index([domainId])
+}
+
+model Payment {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String              @db.Uuid
+  stripePaymentId    String              @unique // Stripe payment_intent, charge, or invoice ID
+  stripeCustomerId   String?             // Stripe customer ID
+  type               PaymentType         // invoice, charge, payment_intent
+  amount             Decimal             @db.Decimal(10, 2) // Amount in the original currency
+  currency           String              @db.VarChar(3) // ISO currency code (USD, EUR, etc.)
+  status             PaymentStatus       // pending, succeeded, failed, canceled, refunded
+  description        String?             @db.Text
+  receiptUrl         String?             @db.Text
+  paymentMethod      String?             @db.VarChar(50) // card, bank_transfer, etc.
+  metadata           Json?               // Additional data like plan info, billing period, etc.
+  periodStart        DateTime?           // For subscription payments
+  periodEnd          DateTime?           // For subscription payments
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  processedAt        DateTime?           // When payment was completed/failed
+  
+  // Relations
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([stripePaymentId])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model ChatRoom {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  live         Boolean           @default(false)
+  paused       Boolean           @default(false)
+  mailed       Boolean           @default(false)
+  shared       Boolean           @default(false)
+  metadata     Json?
+  customerId   String?           @db.Uuid
+  sharedById   String?           @db.Uuid
+  assignedAt   DateTime?
+  assignedToId String?           @db.Uuid
+  message      ChatMessage[]
+  assignedTo   User?             @relation("AssignedChats", fields: [assignedToId], references: [id])
+  Customer     Customer?         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sharedBy     User?             @relation("SharedByUser", fields: [sharedById], references: [id])
+  transfers    TransferRequest[]
+  sharedWith   User[]            @relation("SharedChatRooms")
+
+  @@index([customerId])
+  @@index([sharedById])
+  @@index([assignedToId])
+  @@index([live])
+  @@index([paused])
+}
+
+model ChatMessage {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message        String    @db.Text
+  role           Role?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  chatRoomId     String?   @db.Uuid
+  seen           Boolean   @default(false)
+  teamMemberId   String?
+  teamMemberName String?
+  ChatRoom       ChatRoom? @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+
+  @@index([chatRoomId])
+  @@index([role])
+  @@index([seen])
+  @@index([createdAt])
+}
+
+model Bookings {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date            DateTime  @default(now())
+  slot            String    @default("default")
+  email           String    @default("pending") @db.VarChar(255)
+  customerId      String?   @db.Uuid
+  domainId        String    @db.Uuid
+  createdAt       DateTime  @default(now())
+  name            String    @db.VarChar(255)
+  price           Decimal   @db.Decimal(10, 2)
+  image           String
+  appointmentType String
+  active          Boolean   @default(true)
+  Customer        Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  domain          Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([domainId])
+  @@index([date])
+  @@index([active])
+}
+
+model Campaign {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(255)
+  customers String[]
+  template  String?  @db.Text
+  userId    String?  @db.Uuid
+  createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain    Domain[]
+
+  @@index([userId])
+}
+
+model Product {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String    @db.VarChar(255)
+  price           Decimal   @db.Decimal(10, 2)
+  image           String
+  images          String[]  @default([])
+  description     String?   @db.Text
+  productType     String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  domainId        String?   @db.Uuid
+  hasDiscount     Boolean   @default(false)
+  discount        Int?
+  discountedPrice Decimal?  @db.Decimal(10, 2)
+  variants        Json?
+  productUrl      String?
+  sku             String?   @unique
+  inventory       Int?      @default(0)
+  Domain          Domain?   @relation(fields: [domainId], references: [id])
+
+  @@index([domainId])
+  @@index([active])
+  @@index([productType])
+  @@index([name])
+  @@index([sku])
+}
+
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type      NotificationType
+  message   String           @db.Text
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  userId    String           @db.Uuid
+  domainId  String?          @db.Uuid
+  data      Json?
+  domain    Domain?          @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domainId])
+  @@index([read])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model TeamInvitation {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String           @db.VarChar(255)
+  role       UserRole         @default(MEMBER)
+  status     InvitationStatus @default(PENDING)
+  token      String           @unique
+  expiresAt  DateTime         @default(dbgenerated("(now() + '7 days'::interval)"))
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  senderId   String           @db.Uuid
+  receiverId String?          @db.Uuid
+  receiver   User?            @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  sender     User             @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([token])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model Team {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String            @db.VarChar(255)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  ownerId           String            @db.Uuid
+  joinCode          String?           @unique
+  joinCodeExpiresAt DateTime?
+  domains           Domain[]
+  owner             User              @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  announcements     TeamAnnouncement?
+  settings          TeamSettings?
+  members           User[]
+
+  @@index([ownerId])
+  @@index([joinCode])
+}
+
+model TransferRequest {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chatRoomId String         @db.Uuid
+  fromUserId String         @db.Uuid
+  toUserId   String         @db.Uuid
+  status     TransferStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  chatRoom   ChatRoom       @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  fromUser   User           @relation("FromUser", fields: [fromUserId], references: [id])
+  toUser     User           @relation("ToUser", fields: [toUserId], references: [id])
+
+  @@index([chatRoomId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+}
+
+model TeamSettings {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId             String   @unique @db.Uuid
+  goalSettings       String?  @db.Text
+  recognitionMessage String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  team               Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model TeamAnnouncement {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId    String   @unique @db.Uuid
+  message   String   @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model SystemSettings {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registrationEnabled Boolean   @default(true)
+  loginEnabled        Boolean   @default(true)
+  maintenanceMode     Boolean   @default(false)
+  maintenanceMessage  String?   @db.Text
+  updatedAt           DateTime  @updatedAt
+  updatedBy           String    @db.Uuid
+  forceLogoutAllUsers Boolean   @default(false)
+  lastForceLogoutAt   DateTime?
+  user                User      @relation(fields: [updatedBy], references: [id])
+  
+  @@index([maintenanceMode])
+}
+
+enum Plans {
+  STANDARD
+  PRO
+  ULTIMATE
+}
+
+enum Role {
+  user
+  assistant
+}
+
+enum NotificationType {
+  DOMAIN_SETUP
+  DOMAIN_ACCESS
+  LIVE_SUPPORT
+  NAME_CHANGE
+  PASSWORD_CHANGE
+  PLAN_UPGRADE
+  TEAM_INVITATION
+  TEAM_ROLE_UPDATE
+  TEAM_MESSAGE
+  TRANSFER_REQUEST
+  SHARED_CONVERSATION
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  SUPER_ADMIN
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum PaymentType {
+  INVOICE
+  CHARGE  
+  PAYMENT_INTENT
+  SUBSCRIPTION
+  ONE_TIME
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  REQUIRES_ACTION
+  REQUIRES_CONFIRMATION
+  REQUIRES_PAYMENT_METHOD
+}
+
+// Job model for career listings
+model Job {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String           @db.VarChar(255)
+  department      String
+  location        String
+  locationType    String           // 'remote', 'office', 'hybrid'
+  type            String           // 'full-time', 'part-time', 'contract'
+  description     String           @db.Text
+  responsibilities String[]
+  requirements    String[]
+  benefits        String[]
+  isActive        Boolean          @default(true)
+  postedDate      DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdById     String           @db.Uuid
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  applications    JobApplication[]
+
+  @@index([createdById])
+  @@index([isActive])
+  @@index([department])
+  @@index([location])
+  @@index([locationType])
+  @@index([type])
+}
+
+// JobApplication model for applications to job listings
+model JobApplication {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String   @db.Uuid
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  firstName    String   @db.VarChar(100)
+  lastName     String   @db.VarChar(100)
+  email        String   @db.VarChar(255)
+  phone        String?  @db.VarChar(20)
+  linkedin     String?
+  resumeUrl    String
+  coverLetter  String?  @db.Text
+  status       String   @default("new") // 'new', 'reviewed', 'shortlisted', 'rejected'
+  submittedAt  DateTime @default(now())
+  reviewedAt   DateTime?
+  notes        String?  @db.Text
+
+  @@index([jobId])
+  @@index([status])
+  @@index([email])
+  @@index([submittedAt])
+}
+
+model BlogPost {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String       @db.VarChar(255)
+  content     String       @db.Text
+  image       String
+  slug        String       @unique
+  excerpt     String?      @db.Text
+  published   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  authorId    String?      @db.Uuid
+  author      User?        @relation(fields: [authorId], references: [id])
+  categoryId  String?      @db.Uuid
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  tags        Tag[]
+  views       Int          @default(0)
+  likes       Int          @default(0)
+  comments    Comment[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([published])
+  @@index([slug])
+  @@index([createdAt])
+}
+
+model Category {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @unique @db.VarChar(100)
+  slug        String     @unique
+  description String?    @db.Text
+  posts       BlogPost[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Tag {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String     @unique @db.VarChar(50)
+  slug      String     @unique
+  posts     BlogPost[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content   String   @db.Text
+  author    String   @db.VarChar(100)
+  email     String   @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  postId    String   @db.Uuid
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  approved  Boolean  @default(false)
+
+  @@index([postId])
+  @@index([approved])
+  @@index([createdAt])
+}
+
+model CustomerFeedback {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(100)
+  email       String   @db.VarChar(255)
+  featureType String
+  description String   @db.Text
+  status      String   @default("NEW") // NEW, REVIEWED, IMPLEMENTED, REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([status])
+  @@index([email])
+  @@index([featureType])
+}
+
+model NewsletterSubscriber {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String   @unique @db.VarChar(255)
+  status      String   @default("ACTIVE") // ACTIVE, UNSUBSCRIBED
+  subscribedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([status])
+}
+
+model HelpDeskFeedback {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  helpDeskId  String   @db.Uuid
+  domainId    String   @db.Uuid
+  isHelpful   Boolean  // true for "Yes", false for "No"
+  sessionId   String?  @db.VarChar(255) // To track anonymous users
+  userAgent   String?  @db.Text
+  ipAddress   String?  @db.VarChar(45)
+  createdAt   DateTime @default(now())
+  
+  helpDesk    HelpDesk @relation(fields: [helpDeskId], references: [id], onDelete: Cascade)
+  domain      Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  
+  @@index([helpDeskId])
+  @@index([domainId])
+  @@index([sessionId])
+  @@index([createdAt])
+}

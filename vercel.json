@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npx prisma generate && next build",
+  "installCommand": "npm install",
+  "ignoreCommand": "",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_RUNTIME": "nodejs",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYnJpZWZzdXBwb3J0LmNvbSQ",
+    "CLERK_SECRET_KEY": "sk_live_fAXyLPDH2Uf8OKUl7qV8XM35QcGRiIfNLNi8LN2n7U",
+    "DATABASE_URL": "postgresql://neondb_owner:Ez6KkiShr8VA@ep-quiet-recipe-a2qlzpkw.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+  }
+} 

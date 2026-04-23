@@ -1,0 +1,21 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M25 43.3L50 30V56.7L25 70L0 56.7V30L25 43.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M75 43.3L100 30V56.7L75 70L50 56.7V30L75 43.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M125 43.3L150 30V56.7L125 70L100 56.7V30L125 43.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M175 43.3L200 30V56.7L175 70L150 56.7V30L175 43.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  
+  <path d="M0 86.7L25 73.3V100L0 113.3V86.7Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M50 86.7L75 73.3V100L50 113.3L25 100V73.3L50 86.7Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M100 86.7L125 73.3V100L100 113.3L75 100V73.3L100 86.7Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M150 86.7L175 73.3V100L150 113.3L125 100V73.3L150 86.7Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  
+  <path d="M25 130L50 116.7V143.3L25 156.7L0 143.3V116.7L25 130Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M75 130L100 116.7V143.3L75 156.7L50 143.3V116.7L75 130Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M125 130L150 116.7V143.3L125 156.7L100 143.3V116.7L125 130Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M175 130L200 116.7V143.3L175 156.7L150 143.3V116.7L175 130Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  
+  <path d="M0 173.3L25 160V186.7L0 200V173.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M50 173.3L75 160V186.7L50 200L25 186.7V160L50 173.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M100 173.3L125 160V186.7L100 200L75 186.7V160L100 173.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+  <path d="M150 173.3L175 160V186.7L150 200L125 186.7V160L150 173.3Z" fill="#6366F1" fill-opacity="0.1" stroke="#6366F1" stroke-opacity="0.3"/>
+</svg> 

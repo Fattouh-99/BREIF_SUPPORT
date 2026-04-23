@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .test-content {
+            min-height: 500px;
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .code-block {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            border-left: 4px solid #666;
+            margin: 10px 0;
+        }
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 999999;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-panel" id="debug-panel">
+        <div>🔧 Debug Log:</div>
+        <div id="debug-log">Initializing...</div>
+    </div>
+
+    <div class="container">
+        <h1>Chatbot Test Page</h1>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Make sure your Next.js development server is running on <code>http://localhost:3000</code></li>
+                <li>The chatbot will appear in the bottom-right corner as a floating button</li>
+                <li>Click on it to open the chatbot window</li>
+                <li>This test is configured to use the test endpoint</li>
+                <li>Check the debug panel in the top-left for real-time communication logs</li>
+            </ol>
+            <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;">
+                <strong>Note:</strong> This uses your local development server at <code>http://localhost:3000</code>
+            </div>
+            <div style="background: #d1ecf1; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #bee5eb;">
+                <strong>Test Route:</strong> This test uses <code>/chatbot-test</code> instead of the regular <code>/chatbot</code> route.
+            </div>
+            <div class="code-block">
+                <strong>Domain ID being used:</strong> a97b8499-2fb3-4d4a-826c-b5a87f04ec1d
+            </div>
+        </div>
+
+        <div class="test-content">
+            <h2>Test Content Area</h2>
+            <p>This is where your main content would be. The chatbot should appear as a floating widget in the bottom-right corner.</p>
+            <p>If you don't see the chatbot, check:</p>
+            <ul style="text-align: left; display: inline-block;">
+                <li>Your Next.js server is running on port 3000</li>
+                <li>Debug panel for communication logs</li>
+                <li>Browser console for errors</li>
+                <li>Network tab to see if iframe is loading</li>
+                <li>Make sure the domain ID exists in your database</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Chatbot Integration Script -->
+    <script>
+        // Debug logging function
+        function debugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('debug-log');
+            logElement.innerHTML = `[${timestamp}] ${message}<br>` + logElement.innerHTML;
+            console.log(`[Chatbot Debug] ${message}`);
+        }
+
+        // Simple chatbot iframe embed for local development
+        (function() {
+            // Prevent multiple initializations
+            if (window.chatbotInitialized) return;
+            window.chatbotInitialized = true;
+            
+            debugLog('Initializing chatbot...');
+            
+            // Create the iframe that loads your chatbot
+            const iframe = document.createElement('iframe');
+            iframe.src = 'http://localhost:3000/chatbot-test'; // Point to local development server
+            iframe.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 60px;
+                height: 60px;
+                border: none;
+                border-radius: 12px;
+                z-index: 999998;
+                background: transparent;
+                pointer-events: none;
+                opacity: 0;
+                transition: all 0.3s ease;
+            `;
+            iframe.id = 'chatbot-iframe';
+            
+            // Add iframe to page
+            document.body.appendChild(iframe);
+            debugLog('Iframe added to page');
+            
+            // Listen for messages from the chatbot iframe
+            window.addEventListener('message', (e) => {
+                debugLog(`Received message: ${JSON.stringify(e.data)} from ${e.origin}`);
+                
+                // Allow messages from localhost during development
+                const allowedOrigins = ['http://localhost:3000', 'https://briefsupport.com', 'https://www.briefsupport.com'];
+                if (!allowedOrigins.includes(e.origin)) {
+                    debugLog(`Message from disallowed origin: ${e.origin}`);
+                    return;
+                }
+                
+                // Handle bot ID request
+                if (e.data === 'GET_BOT_ID') {
+                    debugLog('Chatbot requested domain ID, sending response...');
+                    const domainId = 'a97b8499-2fb3-4d4a-826c-b5a87f04ec1d';
+                    iframe.contentWindow.postMessage(domainId, 'http://localhost:3000');
+                    debugLog(`Sent domain ID: ${domainId}`);
+                    return;
+                }
+                
+                // Handle size update messages
+                try {
+                    const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+                    
+                    if (data.width && data.height) {
+                        debugLog(`Updating iframe size: ${data.width}x${data.height}`);
+                        const isMobile = window.innerWidth < 768;
+                        
+                        iframe.style.opacity = '1';
+                        iframe.style.pointerEvents = 'auto';
+                        
+                        if (isMobile) {
+                            // Full screen on mobile when open
+                            iframe.style.top = '0';
+                            iframe.style.left = '0';
+                            iframe.style.bottom = '0';
+                            iframe.style.right = '0';
+                            iframe.style.width = '100%';
+                            iframe.style.height = '100%';
+                            iframe.style.borderRadius = '0';
+                            debugLog('Applied mobile full-screen layout');
+                        } else {
+                            // Use provided dimensions on desktop
+                            iframe.style.width = data.width + 'px';
+                            iframe.style.height = data.height + 'px';
+                            iframe.style.top = 'auto';
+                            iframe.style.left = 'auto';
+                            iframe.style.borderRadius = '12px';
+                            debugLog('Applied desktop window layout');
+                        }
+                    }
+                } catch (err) {
+                    debugLog(`Error parsing message: ${err.message}`);
+                }
+            });
+            
+            iframe.onload = () => {
+                debugLog('Iframe loaded successfully');
+            };
+            
+            iframe.onerror = () => {
+                debugLog('ERROR: Failed to load chatbot iframe');
+            };
+        })();
+    </script>
+</body>
+</html> 

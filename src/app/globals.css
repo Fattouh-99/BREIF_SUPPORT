@@ -1,0 +1,484 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Performance optimizations for chatbot */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure transparent background for chatbot iframe */
+html[data-chatbot-frame="true"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html[data-chatbot-frame="true"] body {
+  background: transparent !important;
+  background-color: transparent !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Additional chatbot transparency fixes */
+[data-chatbot-frame="true"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Smooth scrolling styles */
+html {
+  scroll-behavior: smooth;
+}
+
+/* For Safari and older browsers */
+@supports not (scroll-behavior: smooth) {
+  html {
+    overflow: auto;
+  }
+  
+  body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+/* Smooth transition for page elements */
+.smooth-transitions * {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+/* Reduce animations during active scrolling for better performance */
+.is-scrolling * {
+  transition: none !important;
+}
+
+/* Chatbot iframe specific styles - only apply when in chatbot frame */
+html[data-chatbot-frame="true"] {
+  --background: transparent !important;
+  --foreground: 222.2 84% 4.9% !important;
+  background-color: transparent !important;
+  color: #374151 !important;
+}
+
+html[data-chatbot-frame="true"].light {
+  --background: transparent !important;
+  --foreground: 222.2 84% 4.9% !important;
+  background-color: transparent !important;
+  color-scheme: light !important;
+  color: #374151 !important;
+}
+
+html[data-chatbot-frame="true"].dark {
+  --background: transparent !important;
+  --foreground: 222.2 84% 4.9% !important;
+  background-color: transparent !important;
+  color: #374151 !important;
+}
+
+html[data-chatbot-frame="true"] img {
+  max-width: none;
+}
+
+html[data-chatbot-frame="true"] body {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Additional safeguards for chatbot iframe */
+html[data-chatbot-frame="true"] * {
+  color-scheme: light !important;
+}
+
+html[data-chatbot-frame="true"] *:not([class*="bg-"]):not([style*="background"]) {
+  background-color: transparent !important;
+}
+
+/* Ensure chatbot window has proper background */
+html[data-chatbot-frame="true"] .bg-white {
+  background-color: white !important;
+}
+
+html[data-chatbot-frame="true"] .dark\:bg-slate-800 {
+  background-color: white !important;
+}
+
+.chat-window::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-window {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Override body background for chatbot iframes */
+  html[data-chatbot-frame="true"] body {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+}
+
+.chat-bubble {
+  background-color: #e0e7ff;
+  padding: 16px 28px;
+  -webkit-border-t-radius: 10px;
+  -webkit-border-bottom-left-radius: 2px;
+  -moz-border-t-radius: 10px;
+  -moz-border-radius-bottomleft: 2px;
+  border-radius: 10px;
+  border-bottom-left-radius: 2px;
+  display: inline-block;
+}
+.typing {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 24px;
+  padding: 0 4px;
+}
+
+.typing .dot {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  background-color: #818cf8;
+  border-radius: 50%;
+  display: inline-block;
+  animation: mercuryTypingAnimation 1.4s infinite ease-in-out;
+  transform-origin: center;
+  opacity: 0.8;
+}
+
+.typing .dot:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.typing .dot:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.typing .dot:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.typing .dot:last-child {
+  margin-right: 0;
+}
+
+@keyframes mercuryTypingAnimation {
+  0% {
+    transform: translateY(0px);
+    background-color: #818cf8;
+  }
+  28% {
+    transform: translateY(-7px);
+    background-color: #6366f1;
+  }
+  44% {
+    transform: translateY(0px);
+    background-color: #e0e7ff;
+  }
+}
+
+/* Animation for chat messages */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.my-config {
+  --darkmode: 0;
+  --h-accent: 30;
+  --s-accent: 100%;
+  --l-accent: 50%;
+}
+
+.parsed-container img {
+  width: 100% !important;
+  border-radius: 20px;
+}
+
+/* Enhanced chatbot opening animation - optimized for hardware acceleration */
+@keyframes chatbot-open {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) translateZ(0);
+  }
+}
+
+.chatbot-entering {
+  animation: chatbot-open 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  contain: layout style;
+}
+
+/* Chatbot closing animation */
+@keyframes chatbot-close {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px) translateZ(0);
+  }
+}
+
+.chatbot-exiting {
+  animation: chatbot-close 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none;
+}
+
+/* More efficient pulse border animation */
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+    opacity: 0.8;
+    transform: scale(1) translateZ(0);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(99, 102, 241, 0);
+    opacity: 0.2;
+    transform: scale(1.05) translateZ(0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    opacity: 0;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 0.9s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
+  contain: strict;
+}
+
+/* Maintenance banner positioning */
+.maintenance-banner {
+  position: relative;
+  z-index: 40;
+  width: 100%;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Remove padding-top since we're using a spacer div */
+.maintenance-banner {
+  padding-top: 0;
+}
+
+/* Make the banner sticky just below the navbar */
+@media (min-width: 768px) {
+  .maintenance-banner {
+    position: sticky;
+    top: 59px; /* Height of navbar */
+  }
+}
+
+/* For pages with fixed navbar */
+main.has-navbar-spacing {
+  padding-top: 80px;
+}
+
+/* When maintenance banner is present */
+main.has-navbar-and-banner-spacing {
+  padding-top: 0;
+}
+
+/* When maintenance banner is present, main content doesn't need navbar padding */
+.maintenance-banner + main {
+  padding-top: 1rem;
+}
+
+/* Navbar is typically position fixed or absolute with z-index 50 */
+nav, header {
+  position: relative;
+  z-index: 45;
+}
+
+/* Main content should appear below the banner */
+main {
+  position: relative;
+  z-index: 30;
+}
+
+/* Maintenance mode adjustments */
+html[data-chatbot-frame="true"] .maintenance-banner,
+html[data-chatbot-frame="true"] [data-maintenance-banner] {
+  display: none !important;
+}
+
+/* When in iframe context */
+@media (max-width: 100vw) {
+  :root:not(:root) .maintenance-banner,
+  :root:not(:root) [data-maintenance-banner] {
+    display: none !important;
+  }
+}
+
+/* Ensure proper embedding in iframes */
+:root:not(:root) {
+  background: transparent !important;
+}
+
+/* Hide maintenance elements in chatbot context */
+.chatbot-container .maintenance-banner,
+.chatbot-container [data-maintenance-banner] {
+  display: none !important;
+}
+
+/* Animation keyframes for floating elements */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes float-slow {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Custom animation classes */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+      animation: spin-slow 12s linear infinite;
+  }
