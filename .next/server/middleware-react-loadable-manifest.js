@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"lib/module-compatibility.ts -> firebase/app\":{\"id\":\"lib/module-compatibility.ts -> firebase/app\",\"files\":[\"static/chunks/vendors.js\"]}}"
