@@ -1,17 +1,120 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { extractEmailsFromString, extractURLfromString, findBestMatch } from '@/lib/utils'
+import { extractEmailsFromString, extractURLfromString } from '@/lib/utils'
+import {
+  buildKnowledgeContext,
+  buildSystemPrompt,
+  getCompletionOptions,
+  isExplicitProductCatalogRequest,
+  prepareChatHistory,
+  sanitizeAssistantResponse,
+  shouldInitiateLiveSupport,
+  tryQuickAnswer,
+  type BotPersonalityConfig,
+} from '@/lib/chatbot-ai'
 import { onRealTimeChat, onToggleRealtime } from '../conversation'
 import { clerkClient } from '@clerk/nextjs'
 import { onMailer } from '../mailer'
-import OpenAi from 'openai'
 import { pusherServer } from '@/lib/pusher'
 import { generateUUID } from '@/lib/uuid'
 
-const openai = new OpenAi({
-  apiKey: process.env.OPEN_AI_KEY,
-})
+function getOpenAIModel() {
+  return process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini'
+}
+
+type OpenAIChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+
+function usesMaxCompletionTokens(model: string): boolean {
+  return /^gpt-5|^o[134]/.test(model)
+}
+
+async function createOpenAIChatCompletion(
+  messages: OpenAIChatMessage[],
+  options?: {
+    temperature?: number
+    max_tokens?: number
+    presence_penalty?: number
+    frequency_penalty?: number
+  }
+) {
+  const apiKey = process.env.OPEN_AI_KEY?.trim()
+  if (!apiKey) {
+    throw new Error('OPEN_AI_KEY is not configured')
+  }
+
+  const model = getOpenAIModel()
+  const maxOutputTokens = options?.max_tokens ?? 900
+
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+  }
+
+  if (usesMaxCompletionTokens(model)) {
+    // GPT-5 / o-series: use max_completion_tokens only; temperature must stay at default
+    body.max_completion_tokens = maxOutputTokens
+  } else {
+    body.temperature = options?.temperature ?? 0.5
+    body.max_tokens = maxOutputTokens
+    body.presence_penalty = options?.presence_penalty ?? 0.1
+    body.frequency_penalty = options?.frequency_penalty ?? 0.1
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.error?.message || 'OpenAI API request failed'
+    ) as Error & { status?: number; code?: string }
+    error.status = response.status
+    error.code = data?.error?.code
+    throw error
+  }
+
+  return data as {
+    choices: Array<{ message: { content: string | null } }>
+  }
+}
+
+function getOpenAIErrorMessage(error: unknown): string {
+  const err = error as { status?: number; code?: string; message?: string }
+
+  if (err?.code === 'unsupported_parameter' || err?.code === 'unsupported_value' || err?.message?.includes('max_completion_tokens') || err?.message?.includes('temperature')) {
+    return `The OpenAI model "${getOpenAIModel()}" rejected a request setting. Try OPENAI_MODEL=gpt-4o in .env for broader compatibility, or restart the dev server.`
+  }
+
+  if (err?.code === 'invalid_api_key' || err?.status === 401) {
+    return 'Your OpenAI API key was rejected. Check OPEN_AI_KEY in .env and restart the dev server.'
+  }
+
+  if (err?.status === 404) {
+    return `The OpenAI model "${getOpenAIModel()}" is unavailable on your account. Set OPENAI_MODEL=gpt-4o-mini in .env and restart the dev server.`
+  }
+
+  if (err?.code === 'insufficient_quota' || err?.message?.includes('exceeded your current quota')) {
+    return 'Your OpenAI account has no credits left. Add billing or top up at platform.openai.com, then try again.'
+  }
+
+  if (err?.status === 429) {
+    return 'OpenAI rate limit reached. Please wait a moment and try again.'
+  }
+
+  if (err?.code === 'ERR_STREAM_PREMATURE_CLOSE' || err?.message?.includes('Premature close')) {
+    return 'OpenAI connection dropped. Wait a few seconds and try again.'
+  }
+
+  return 'AI chat is temporarily unavailable. Please try again in a moment.'
+}
 
 export const onStoreConversations = async (
   id: string,
@@ -212,14 +315,13 @@ export const onGetCurrentChatBot = async (id: string) => {
   }
 }
 
-let customerEmail: string | undefined
-
 export const onAiChatBotAssistant = async (
   id: string,
   chat: { role: 'assistant' | 'user'; content: string }[],
   author: 'user',
   message: string
 ) => {
+  let customerEmail: string | undefined
   try {
     console.log('Starting AI chatbot assistant flow with message:', message);
     
@@ -607,17 +709,44 @@ export const onAiChatBotAssistant = async (
             price: true,
           },
         },
+        helpdesk: {
+          where: {
+            isPublished: true,
+          },
+          select: {
+            title: true,
+            question: true,
+            answer: true,
+            content: true,
+          },
+          orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+          take: 20,
+        },
       },
     })
 
     if (chatBotDomain) {
-      // Check if this is a product-related query
-      const isProductQuery = message.toLowerCase().includes('product') || 
-                           message.toLowerCase().includes('show me') ||
-                           message.toLowerCase().includes('what do you have') ||
-                           message.toLowerCase().includes('what do you sell') ||
-                           message.toLowerCase().includes('list') ||
-                           message.toLowerCase().includes('available');
+      const knowledge = buildKnowledgeContext({
+        filterQuestions: chatBotDomain.filterQuestions,
+        helpdesk: chatBotDomain.helpdesk,
+        products: chatBotDomain.products || [],
+        bookings: chatBotDomain.bookings || [],
+      })
+
+      const quickAnswer = tryQuickAnswer(message, knowledge)
+      if (quickAnswer) {
+        return {
+          response: {
+            role: 'assistant' as const,
+            content: quickAnswer,
+          },
+        }
+      }
+
+      const isProductQuery =
+        isExplicitProductCatalogRequest(message) &&
+        !!chatBotDomain.chatBot?.productsEnabled &&
+        !!chatBotDomain.products?.length
 
       // Extract filtering criteria from the message
       const extractFilteringCriteria = (message: string, previousMessages: { role: string; content: string }[]) => {
@@ -885,187 +1014,49 @@ export const onAiChatBotAssistant = async (
         }
       }
 
-      const botConfig = {
-        // Default personality settings
+      const botConfig: BotPersonalityConfig = {
         personality: chatBotDomain.chatBot?.personality || 'professional',
         tone: chatBotDomain.chatBot?.tone || 'friendly',
-        businessDescription: chatBotDomain.chatBot?.businessDescription || 'We strive to provide excellent service to our customers',
-        industry: chatBotDomain.chatBot?.industry || 'retail',
-        responseStyle: chatBotDomain.chatBot?.responseStyle || 'conversational',
+        businessDescription:
+          chatBotDomain.chatBot?.businessDescription ||
+          `${chatBotDomain.name} provides customer support and assistance.`,
+        industry: chatBotDomain.chatBot?.industry || 'general',
+        responseStyle: chatBotDomain.chatBot?.responseStyle || 'clear and helpful',
         handoffPreference: chatBotDomain.chatBot?.handoffPreference || 'moderate',
-        
-        // Default shipping settings
         shippingEnabled: chatBotDomain.chatBot?.shippingEnabled || false,
         shippingTime: chatBotDomain.chatBot?.shippingTime || '3-5 business days',
         shippingRegions: chatBotDomain.chatBot?.shippingRegions || ['domestic'],
-        shippingCosts: chatBotDomain.chatBot?.shippingCosts || {},
         freeShippingThreshold: chatBotDomain.chatBot?.freeShippingThreshold || null,
+        productsEnabled: chatBotDomain.chatBot?.productsEnabled || false,
       }
-      
-      // Create dynamic product and booking information only if products are enabled
-      const productsInfo = chatBotDomain.chatBot?.productsEnabled && chatBotDomain.products?.length 
-        ? `Available products:\n${chatBotDomain.products
-            .map((p: any) => `${p.name} - $${p.hasDiscount ? p.discountedPrice : p.price}`)
-            .join('\n\n')}`
-        : chatBotDomain.chatBot?.productsEnabled 
-          ? 'Currently, no active products are available.' 
-          : 'Products feature is disabled for this chatbot.';
 
-      const systemMessage = `You are an elite AI sales assistant for ${chatBotDomain.name}, trained in advanced sales psychology and conversion optimization. Your mission is to guide customers to successful purchases while maintaining absolute accuracy and professionalism.
+      const systemMessage = buildSystemPrompt(
+        chatBotDomain.name,
+        botConfig,
+        knowledge
+      )
+      const conversationHistory = prepareChatHistory(chat, message)
+      const completionOptions = getCompletionOptions()
 
-BOT PERSONALITY CONFIGURATION:
-${botConfig.personality ? `Personality: ${botConfig.personality}` : ''}
-${botConfig.tone ? `Tone: ${botConfig.tone}` : ''}
-${botConfig.businessDescription ? `Business Description: ${botConfig.businessDescription}` : ''}
-${botConfig.industry ? `Industry: ${botConfig.industry}` : ''}
-${botConfig.responseStyle ? `Response Style: ${botConfig.responseStyle}` : ''}
-${botConfig.handoffPreference ? `Handoff Preference: ${botConfig.handoffPreference}` : ''}
-
-SHIPPING CONFIGURATION:
-${botConfig.shippingEnabled ? `
-- Shipping Available: Yes
-${botConfig.shippingTime ? `- Estimated Shipping Time: ${botConfig.shippingTime}` : ''}
-${botConfig.shippingRegions?.length ? `- Shipping Regions: ${botConfig.shippingRegions.join(', ')}` : ''}
-${botConfig.freeShippingThreshold ? `- Free Shipping Threshold: $${botConfig.freeShippingThreshold}` : ''}
-` : '- Shipping Not Available'}
-
-BUSINESS TYPE: ${chatBotDomain.chatBot?.productsEnabled ? 'PRODUCTS' : 'SERVICES'}
-
-CORE RESPONSIBILITIES:
-${chatBotDomain.chatBot?.productsEnabled ? `1. Guide customers through product selection
-2. Only discuss products when specifically asked
-3. Collect email when customer is ready to proceed
-4. Narrow down product recommendations based on customer needs through follow-up questions
-5. Provide appropriate payment links if available
-6. Transfer to live support when needed
-7. Make intelligent product recommendations based on customer needs` : `1. Provide customer support and assistance
-2. Answer questions about our services
-3. Collect email when customer is ready to proceed
-4. Transfer to live support when needed
-5. Provide helpful information and guidance`}
-
-PRODUCT AND PRICING INFORMATION RULES:
-1. Only show product listings when:
-   - Customer explicitly asks about prices
-   - Customer asks to see available products
-   - Customer requests specific product information
-   
-2. For general questions:
-   - Provide helpful responses without listing all products
-   - Ask clarifying questions to understand needs
-   - Only mention specific products when relevant to the query
-
-3. When to show full product list:
-   - "What products do you offer?"
-   - "Can I see your prices?"
-   - "What's available?"
-   - "Show me your products"
-
-4. For other questions:
-   - Focus on understanding customer needs first
-   - Only reference specific products when directly relevant
-   - Guide conversation naturally without forcing product information
-
-PRODUCT LIST (DO NOT SHOW UNLESS EXPLICITLY REQUESTED):
-${productsInfo}
-
-RESPONSE STRUCTURE:
-1. Start with direct answer to customer's question
-2. Ask relevant follow-up questions
-3. Only show product/pricing lists if explicitly requested
-4. End with clear next steps or clarifying questions
-
-INTERACTION RULES:
-
-1. BUSINESS TYPE HANDLING:
-- Focus exclusively on products
-- Guide customers through available products
-- ${chatBotDomain.products?.length ? 'Present products with clear pricing and features' : 'Inform that no products are currently available'}
-
-2. EMAIL COLLECTION:
-- Only request email when customer is ready to:
-  * Make a purchase
-  * Connect to live support
-- Explain why email is needed
-- After collecting email, continue with previous context
-
-3. PRODUCT HANDLING:
-${chatBotDomain.products?.length
-  ? `
-- Guide customer through selection
-- Provide payment link after email collection:
-  /portal/${id}/payment/${checkCustomer?.customer[0]?.id} if available`
-  : '- Inform customers that no products are currently available'}
-
-4. LIVE SUPPORT TRANSFER PROTOCOL:
-When transferring to live support:
-1. Always include the exact text "LIVE_SUPPORT_REQUESTED" at the start of your response
-2. Then provide your normal response to the user
-3. Example: "LIVE_SUPPORT_REQUESTED\nI'll connect you with our live support team right away..."
-
-5. LIVE SUPPORT TRANSFER:
-- If you cannot effectively handle a customer's query:
-  1. First check if you have their email
-  2. If no email, ask for it explaining it's needed for live support
-  3. When initiating transfer, ALWAYS start response with "LIVE_SUPPORT_REQUESTED"
-
-- Scenarios requiring transfer:
-  * Complex product questions you can't answer
-  * Technical issues
-  * Special requests or customizations
-  * Customer dissatisfaction
-  * Any situation beyond your capabilities
-  * When customer explicitly requests live support
-
-6. RESPONSE STYLE:
-- Be professional and friendly
-- Keep responses concise and clear
-- Always confirm understanding
-- Maintain conversation context
-
-Previous conversation context follows below:`;
-
-      const chatCompletion = await openai.chat.completions.create({
-        messages: [
+      const chatCompletion = await createOpenAIChatCompletion(
+        [
           { role: 'system', content: systemMessage },
-          ...chat,
-          { role: 'user', content: message }
+          ...conversationHistory,
+          { role: 'user', content: message },
         ],
-        model: 'gpt-4',
-        temperature: 0.5,
-        max_tokens: 500,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3
-      });
+        completionOptions
+      );
 
-      // Check if live support is requested
-      let isLiveSupportRequested = 
-        message.toLowerCase().includes('live_support_requested') ||
-        chatCompletion.choices[0].message.content?.includes('LIVE_SUPPORT_REQUESTED') ||
-        message.toLowerCase().includes('live support') ||
-        message.toLowerCase().includes('speak to someone') ||
-        message.toLowerCase().includes('talk to someone') ||
-        message.toLowerCase().includes('speak to a person') ||
-        message.toLowerCase().includes('talk to a person') ||
-        message.toLowerCase().includes('speak to an agent') ||
-        message.toLowerCase().includes('talk to an agent') ||
-        message.toLowerCase().includes('connect with support') ||
-        message.toLowerCase().includes('connect to support') ||
-        message.toLowerCase().includes('customer service') ||
-        message.toLowerCase().includes('help desk') ||
-        message.toLowerCase().includes('support team');
+      const rawAssistantContent =
+        chatCompletion.choices[0].message.content?.trim() || ''
+      const assistantContent = sanitizeAssistantResponse(rawAssistantContent)
 
-      // Also mark live support as requested if this is a follow-up message after email was requested
-      const isFollowUpEmailResponse = 
-        customerEmail && 
-        chat.length >= 2 && 
-        chat[chat.length-2]?.content?.includes("I'll need your email address") &&
-        chat[chat.length-2]?.role === 'assistant';
-        
-      if (isFollowUpEmailResponse) {
-        console.log("Detected follow-up email response. Email:", customerEmail);
-        isLiveSupportRequested = true;
-      }
+      let isLiveSupportRequested = shouldInitiateLiveSupport(
+        message,
+        rawAssistantContent,
+        conversationHistory,
+        customerEmail
+      );
 
       if (isLiveSupportRequested) {
         let chatRoomId;
@@ -1130,15 +1121,58 @@ Previous conversation context follows below:`;
 
             // If chat room exists, add the new message to it
             if (chatRoomId) {
-              await prisma.chatMessage.create({
-                data: {
-                  chatRoomId,
-                  message,
-                  role: 'user',
-                  seen: false
-                }
-              });
-              console.log('Added user message to existing chat room');
+              const existingMessages = existingCustomer.chatRoom[0]?.message || []
+              const existingContents = new Set(
+                existingMessages.map((entry) => `${entry.role}:${entry.message.trim()}`)
+              )
+
+              for (const turn of chat) {
+                const content = turn.content?.trim()
+                if (!content) continue
+
+                const key = `${turn.role}:${content}`
+                if (existingContents.has(key)) continue
+
+                await prisma.chatMessage.create({
+                  data: {
+                    chatRoomId,
+                    message: content,
+                    role: turn.role,
+                    seen: true,
+                  },
+                })
+                existingContents.add(key)
+              }
+
+              const currentMessageKey = `user:${message.trim()}`
+              if (!existingContents.has(currentMessageKey)) {
+                await prisma.chatMessage.create({
+                  data: {
+                    chatRoomId,
+                    message,
+                    role: 'user',
+                    seen: false,
+                  },
+                })
+              }
+              console.log('Synced conversation history to existing chat room');
+
+              // Already in live mode — don't re-initiate (avoids duplicate system messages)
+              if (existingCustomer.chatRoom[0]?.live) {
+                return {
+                  response: {
+                    role: 'assistant',
+                    content:
+                      "You're already connected with our live support team. A team member will respond shortly.",
+                  },
+                  live: true,
+                  chatRoom: chatRoomId,
+                  supportAgent: {
+                    name: 'AI Assistant',
+                    role: 'support',
+                  },
+                };
+              }
             }
           } else {
             console.log('Customer exists but has no chat room, creating new one');
@@ -1348,35 +1382,6 @@ Previous conversation context follows below:`;
                     });
                   }
                   console.log('Sent backup notification to chat-global channel');
-                  
-                  // Call our dedicated notification API endpoint (added for redundancy)
-                  try {
-                    const apiUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-                    const notifyUrl = `${apiUrl}/api/notify/real-time`;
-                    console.log('Calling dedicated notification API at:', notifyUrl);
-                    
-                    const notifyResponse = await fetch(notifyUrl, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        chatRoomId,
-                        customerEmail,
-                        message: message.substring(0, 100), // Truncate for safety
-                        domainId: id,
-                      }),
-                    });
-                    
-                    if (notifyResponse.ok) {
-                      console.log('Successfully sent dedicated real-time notification');
-                    } else {
-                      console.error('Failed to send dedicated notification:', 
-                        await notifyResponse.json().catch(() => 'Could not parse response'));
-                    }
-                  } catch (notifyError) {
-                    console.error('Error calling dedicated notification API:', notifyError);
-                  }
                 } catch (pusherError) {
                   console.error('Error sending Pusher notification:', pusherError);
                 }
@@ -1388,17 +1393,10 @@ Previous conversation context follows below:`;
           
           const response = {
             role: 'assistant',
-            content: "LIVE_SUPPORT_INITIATED\nI'll connect you with our live support team right away. One of our team members will be with you shortly to assist you better.",
+            content: "I'll connect you with our live support team right away. One of our team members will be with you shortly to assist you better.",
           };
 
           console.log('Sending transition message');
-
-          // Store and send the transition message
-          await onStoreConversations(
-            chatRoomId,
-            response.content,
-            'assistant'
-          );
 
           // Generate a proper UUID v4 for the message ID
           const messageId = generateUUID();
@@ -1431,11 +1429,11 @@ Previous conversation context follows below:`;
       }
 
       if (chatCompletion) {
-        let content = chatCompletion.choices[0].message.content as string;
+        let content = assistantContent || rawAssistantContent;
         
         // Add customer warning when approaching limit (90-99%)
         if (usagePercentage >= 90 && usagePercentage < 100) {
-          content += "\n\n📢 *Note: This chat support is approaching its monthly usage limit. If you need immediate assistance, please contact support directly.*"
+          content += "\n\nNote: This chat support is approaching its monthly usage limit. If you need immediate assistance, please contact support directly."
         }
         
         // Look for URLs in the format /portal/...
@@ -1463,7 +1461,12 @@ Previous conversation context follows below:`;
     }
   } catch (error) {
     console.error('OpenAI API Error:', error)
-    throw error
+    return {
+      response: {
+        role: 'assistant',
+        content: getOpenAIErrorMessage(error),
+      },
+    }
   }
 }
 

@@ -26,15 +26,6 @@ const nextConfig = {
     instrumentationHook: false,
     serverComponentsExternalPackages: ['formidable'],
   },
-  webpack: (config, { isServer }) => {
-    // Add webpack configuration to handle module resolution
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      "node-fetch-native": false,
-    };
-    
-    return config;
-  },
   // Enable standalone output for production deployment
   output: 'standalone',
   // Force all pages to use Server-Side Rendering
@@ -249,51 +240,10 @@ const nextConfig = {
   // Option to disable middleware
   skipMiddlewareUrlNormalize: true,
   webpack: (config, { isServer }) => {
-    if (!isServer) {
-      if (!config.optimization) {
-        config.optimization = {};
-      }
-      
-      if (!config.optimization.splitChunks || config.optimization.splitChunks === false) {
-        config.optimization.splitChunks = {};
-      }
-      
-      // Enhance code-splitting configuration for better performance
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendors: {
-            test: /[\\/]node_modules[\\/](?!.*\.css$)/,
-            name: 'vendors',
-            chunks: 'all',
-            priority: 20,
-            enforce: true,
-            reuseExistingChunk: true,
-          },
-          styles: {
-            name: 'styles',
-            test: /\.css$/,
-            chunks: 'all',
-            enforce: true,
-          },
-          common: {
-            name: 'common',
-            minChunks: 2,
-            chunks: 'all',
-            priority: 10,
-            reuseExistingChunk: true,
-            enforce: true,
-          },
-          // Separate larger dependencies 
-          frameworkChunk: {
-            test: /[\\/]node_modules[\\/](react|react-dom|framer-motion)[\\/]/,
-            name: 'framework',
-            chunks: 'all',
-            priority: 30,
-          },
-        },
-      };
-    }
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "node-fetch-native": false,
+    };
 
     // Add support for importing .node files
     config.module.rules.push({
@@ -315,7 +265,43 @@ const nextConfig = {
       : [];
 
     return [
-      // Special headers for chatbot embed route - allow it to be embedded anywhere
+      // Special headers for chatbot embed routes - allow embedding anywhere
+      {
+        source: '/chatbot-test',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: [
+              'camera=()',
+              'microphone=()',
+              'geolocation=()',
+              'interest-cohort=()',
+              'payment=(self "https://js.stripe.com" "https://checkout.stripe.com")',
+              'usb=()',
+              'fullscreen=(self)',
+              'display-capture=(self)'
+            ].join(', '),
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https: ${developmentCSP.join(' ')}`,
+              `worker-src 'self' blob:`,
+              `object-src 'self' data:`,
+              `style-src 'self' 'unsafe-inline' https: ${developmentCSP.join(' ')}`,
+              `img-src 'self' data: blob: https: ${developmentCSP.join(' ')}`,
+              `font-src 'self' https: ${developmentCSP.join(' ')}`,
+              `connect-src 'self' https: wss: ${process.env.NODE_ENV === 'development' ? 'http: ws:' : ''} https://*.clerk.accounts.dev https://*.analytics.google.com https://api.stripe.com https://js.stripe.com ${developmentCSP.join(' ')}`,
+              `frame-src 'self' data: https: https://js.stripe.com https://checkout.stripe.com ${process.env.NODE_ENV === 'development' ? 'http:' : ''} ${developmentCSP.join(' ')}`,
+              `frame-ancestors *`,
+            ].join('; ')
+          }
+        ]
+      },
       {
         source: '/chatbot',
         headers: [

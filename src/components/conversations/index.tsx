@@ -214,11 +214,23 @@ const ConversationMenu = ({ domains }: Props) => {
   }, [currentUser, onGetActiveChatMessages, refreshChats, toast, chatContext]);
 
   useEffect(() => {
+    let isMounted = true
+
     const checkTeamMembership = async () => {
-      const result = await onGetTeamMembers()
-      setIsTeamMember(!!result.team)
+      try {
+        const result = await onGetTeamMembers()
+        if (!isMounted) return
+        setIsTeamMember(Boolean(result?.team))
+      } catch {
+        if (isMounted) setIsTeamMember(false)
+      }
     }
+
     checkTeamMembership()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // Set up automatic message refresh for the active chat when receiving customer messages

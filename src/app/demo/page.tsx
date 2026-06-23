@@ -1250,10 +1250,10 @@ export default function DemoPage() {
                     </motion.button>
                     
                     <Link 
-                      href="/dashboard" 
+                      href="/conversation" 
                       className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium shadow-md hover:bg-gray-200 transition-colors"
                     >
-                      Return to Dashboard
+                      Return to Conversations
                     </Link>
                   </motion.div>
                 </motion.div>

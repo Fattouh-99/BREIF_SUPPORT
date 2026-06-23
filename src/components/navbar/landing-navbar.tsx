@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Moon, Sun, Menu, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 interface NavItem {
   name: string;
@@ -23,8 +22,6 @@ export function LandingNavbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const router = useRouter();
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -33,18 +30,6 @@ export function LandingNavbar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Function to handle login button click
-  const handleLoginClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    router.push('/auth/sign-in');
-  };
-
-  // Function to handle signup button click
-  const handleSignupClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    router.push('/auth/sign-up');
-  };
 
   return (
     <header
@@ -89,11 +74,11 @@ export function LandingNavbar() {
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
           
-          <Button asChild className="rounded-full" onClick={handleSignupClick}>
-            <Link href="#" onClick={handleSignupClick}>Get Started</Link>
+          <Button asChild className="rounded-full">
+            <Link href="/auth/sign-up">Get Started</Link>
           </Button>
-          <Button asChild variant="outline" className="rounded-full" onClick={handleLoginClick}>
-            <Link href="#" onClick={handleLoginClick}>Log In</Link>
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/auth/sign-in">Log In</Link>
           </Button>
         </div>
 
@@ -143,24 +128,11 @@ export function LandingNavbar() {
                   {item.name}
                 </Link>
               ))}
-              <Button 
-                className="mt-4 rounded-full" 
-                onClick={(e) => {
-                  setMobileNavOpen(false);
-                  handleSignupClick(e);
-                }}
-              >
-                <Link href="#" onClick={handleSignupClick}>Get Started</Link>
+              <Button asChild className="mt-4 rounded-full" onClick={() => setMobileNavOpen(false)}>
+                <Link href="/auth/sign-up">Get Started</Link>
               </Button>
-              <Button 
-                variant="outline" 
-                className="rounded-full" 
-                onClick={(e) => {
-                  setMobileNavOpen(false);
-                  handleLoginClick(e);
-                }}
-              >
-                <Link href="#" onClick={handleLoginClick}>Log In</Link>
+              <Button asChild variant="outline" className="rounded-full" onClick={() => setMobileNavOpen(false)}>
+                <Link href="/auth/sign-in">Log In</Link>
               </Button>
             </div>
           </motion.div>

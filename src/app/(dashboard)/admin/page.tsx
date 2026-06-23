@@ -107,7 +107,7 @@ export default function AdminDashboard() {
             description: result.error || 'You do not have permission to access the admin dashboard',
             variant: 'destructive'
           })
-          router.push('/dashboard')
+          router.push('/conversation')
           return
         }
         
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
           description: 'Failed to load admin dashboard',
           variant: 'destructive'
         })
-        router.push('/dashboard')
+        router.push('/conversation')
       } finally {
         setLoading(false)
       }

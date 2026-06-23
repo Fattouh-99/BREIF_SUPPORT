@@ -76,7 +76,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
               onClick={onContinue}
               className="w-full bg-indigo-600 hover:bg-indigo-700"
             >
-              {isSignup ? 'Continue Setup' : 'Continue to Dashboard'}
+              {isSignup ? 'Continue Setup' : 'Continue to Conversations'}
             </Button>
             
             {onChangePlan && (

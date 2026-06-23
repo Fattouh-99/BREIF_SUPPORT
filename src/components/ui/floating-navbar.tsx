@@ -49,7 +49,7 @@ export const FloatingNav = ({
     
     // If user is already logged in, redirect to dashboard
     if (isLoaded && userId) {
-      router.push('/dashboard');
+      router.push('/conversation');
     } else {
       // Otherwise go to specified auth route
       router.push(route);

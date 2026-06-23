@@ -31,6 +31,7 @@ const AiChatBot = ({ isPublic = false }: Props) => {
     setOnChats,
     errors,
     resetChatState,
+    startNewConversation,
     handleMinimize,
   } = useChatBot({ isPublic: effectiveIsPublic })
   
@@ -196,6 +197,7 @@ const AiChatBot = ({ isPublic = false }: Props) => {
       onClose: handleClose,
       onMinimize: handleMinimize,
       onExpand: handleWindowExpand,
+      onStartNewChat: startNewConversation,
       products: currentBot?.products || [],
       productsEnabled: currentBot?.chatBot?.productsEnabled,
       customLinks: currentBot?.chatBot?.customLinks?.map(link => ({
@@ -222,7 +224,7 @@ const AiChatBot = ({ isPublic = false }: Props) => {
     };
   }, [
     errors, setOnChats, onRealTime, currentBot, getValidIconStyle,
-    onChats, register, onStartChatting, onAiTyping, handleClose, handleMinimize,
+    onChats, register, onStartChatting, onAiTyping, handleClose, handleMinimize, startNewConversation,
     buttonPosition, currentBot?.chatBot?.chatbotEnabled, currentBot?.chatBot?.productsEnabled, 
     currentBot?.chatBot?.customLinksEnabled, currentBot?.chatBot?.popularTopicsEnabled, 
     currentBot?.chatBot?.homeLayout, currentBotId, windowAnimationState

@@ -1219,7 +1219,7 @@ export default function TeamManagementPage() {
         setShareEmail('');
         setIsShareModalOpen(false);
       } else {
-        toast.error(result.error || 'Failed to send join code');
+        toast.error(result.error || 'Failed to send join code', { duration: 10000 });
       }
     } catch (error: any) {
       console.error('Error sending join code via email:', error);

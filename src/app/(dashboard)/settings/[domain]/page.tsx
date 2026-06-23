@@ -520,6 +520,10 @@ const DomainSettingsPage = async ({ params }: Props) => {
                         id={currentDomain.id}
                         products={('products' in currentDomain) ? (currentDomain as any).products?.map((product: any) => ({
                           ...product,
+                          price: parseFloat(product.price?.toString?.() ?? product.price ?? '0'),
+                          discountedPrice: product.discountedPrice != null
+                            ? parseFloat(product.discountedPrice?.toString?.() ?? product.discountedPrice)
+                            : product.discountedPrice,
                           createdAt: product.createdAt.toISOString(),
                           updatedAt: product.updatedAt.toISOString()
                         })) || [] : []}

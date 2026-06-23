@@ -4,7 +4,7 @@ import { currentUser } from "@clerk/nextjs/server"
 import { client } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { UserRole } from "@prisma/client"
-import nodemailer from 'nodemailer'
+import { formatMailError, sendMail } from '@/lib/mailer'
 
 /**
  * Generate a random join code of specified length
@@ -266,20 +266,9 @@ export async function sendJoinCodeViaEmail(email: string, joinCode: string, team
       return { success: false, error: 'Only team owners can share join codes' }
     }
     
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.NODE_MAILER_EMAIL,
-        pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-      },
-    })
-
     const senderName = dbUser.fullname || user.firstName || 'Team Owner';
 
-    const mailOptions = {
-      from: process.env.NODE_MAILER_EMAIL,
+    await sendMail({
       to: email,
       subject: `Invitation to Join ${teamName} on Brief Support`,
       html: `
@@ -298,7 +287,7 @@ export async function sendJoinCodeViaEmail(email: string, joinCode: string, team
           </div>
           
           <p style="font-size: 16px; line-height: 1.5;">
-            To join the team, sign in to your Brief Support account and enter the join code when prompted.
+            To join the team, sign in to your Brief Support account, go to Team, and enter the join code when prompted.
           </p>
           
           <div style="text-align: center; margin-top: 30px; padding: 20px; background-color: #F3F4F6;">
@@ -309,9 +298,7 @@ export async function sendJoinCodeViaEmail(email: string, joinCode: string, team
           </div>
         </div>
       `,
-    }
-
-    await transporter.sendMail(mailOptions)
+    })
     
     return {
       success: true,
@@ -321,7 +308,7 @@ export async function sendJoinCodeViaEmail(email: string, joinCode: string, team
     console.error('Error sending join code via email:', error)
     return {
       success: false,
-      error: 'Failed to send join code via email'
+      error: formatMailError(error)
     }
   }
 } 

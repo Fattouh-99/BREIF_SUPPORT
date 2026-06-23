@@ -9,7 +9,7 @@ import { TabsContent } from '../ui/tabs'
 import { DataTable } from '../table'
 import { TableCell, TableRow } from '../ui/table'
 import Image from 'next/image'
-import { getMonthName } from '@/lib/utils'
+import { getMonthName, formatMoney, toNumber } from '@/lib/utils'
 import { Switch } from '../ui/switch'
 import { onToggleProductStatus, onDeleteProduct } from '@/actions/settings'
 import { Button } from '../ui/button'
@@ -188,7 +188,7 @@ const ProductTable = ({ id, products: initialProducts }: Props) => {
                             {option.priceAdjustment ? (
                               <>
                                 {option.priceAdjustment > 0 ? '+$' : '-$'}
-                                {Math.abs(option.priceAdjustment).toFixed(2)}
+                                {Math.abs(toNumber(option.priceAdjustment)).toFixed(2)}
                               </>
                             ) : '$0.00'}
                           </span>
@@ -223,10 +223,10 @@ const ProductTable = ({ id, products: initialProducts }: Props) => {
             {product.hasDiscount ? (
               <>
                 <span className="text-gray-500 line-through text-sm">
-                  ${product.price.toFixed(2)}
+                  ${formatMoney(product.price)}
                 </span>
                 <span className="text-green-600 font-medium">
-                  ${(product.discountedPrice || 0).toFixed(2)}
+                  ${formatMoney(product.discountedPrice)}
                 </span>
                 <span className="text-xs text-indigo-600 font-medium">
                   -{product.discount}% off
@@ -234,7 +234,7 @@ const ProductTable = ({ id, products: initialProducts }: Props) => {
               </>
             ) : (
               <span className="text-gray-900 font-medium">
-                ${product.price.toFixed(2)}
+                ${formatMoney(product.price)}
               </span>
             )}
           </div>

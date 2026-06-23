@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { client } from '@/lib/prisma'
 import { z } from 'zod'
-import nodemailer from 'nodemailer'
+import { createMailTransporter, getMailFromAddress } from '@/lib/mailer'
+import { SUPPORT_EMAIL } from '@/constants/support'
 
 // Validation schema for inquiry data
 const InquirySchema = z.object({
@@ -135,18 +136,10 @@ export async function POST(request: NextRequest) {
     // Send email notification to domain owner
     if (domain.User?.email) {
       try {
-        const transporter = nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          auth: {
-            user: process.env.NODE_MAILER_EMAIL,
-            pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-          },
-        })
+        const transporter = createMailTransporter()
 
         const mailOptions = {
-          from: process.env.NODE_MAILER_EMAIL,
+          from: getMailFromAddress(),
           to: domain.User.email,
           subject: `New Inquiry from ${domain.name} - ${name}`,
           html: `
@@ -177,7 +170,7 @@ export async function POST(request: NextRequest) {
                 <p style="color: #6B7280; font-size: 14px;">
                   Best regards,<br>
                   The Brief Support Team<br>
-                  <a href="mailto:support@briefsupport.com" style="color: #4F46E5;">support@briefsupport.com</a>
+                  <a href="mailto:${SUPPORT_EMAIL}" style="color: #4F46E5;">${SUPPORT_EMAIL}</a>
                 </p>
               </div>
             </div>

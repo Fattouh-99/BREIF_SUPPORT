@@ -51,7 +51,7 @@ const MaxMenu = ({ current, domains, onExpand, onSignOut, userType, isLoggingOut
             <>
               {/* Show Regular Admin Menu Items */}
               {SIDE_BAR_MENU
-                .filter(menu => !menu.adminOnly && ['Dashboard', 'Settings'].includes(menu.label))
+                .filter(menu => !menu.adminOnly && ['Conversations', 'Settings'].includes(menu.label))
                 .map((menu, key) => (
                   <MenuItem
                     size="max"
@@ -81,9 +81,9 @@ const MaxMenu = ({ current, domains, onExpand, onSignOut, userType, isLoggingOut
             /* For non-SUPER_ADMIN users, show filtered menu items as before */
             SIDE_BAR_MENU
               .filter(menu => {
-                // If user is a MEMBER, only show Dashboard, Conversations, and Settings
+                // If user is a MEMBER, only show Conversations and Settings
                 if (userType === UserRole.MEMBER) {
-                  return ['Dashboard', 'Conversations', 'Settings'].includes(menu.label);
+                  return ['Conversations', 'Settings'].includes(menu.label);
                 }
                 
                 // Otherwise use existing filters

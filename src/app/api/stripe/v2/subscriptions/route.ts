@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     // Use Stripe Checkout for paid plans
     if (useCheckout) {
       const baseUrl = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL
-      const successUrl = `${baseUrl}/dashboard/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`
-      const cancelUrl = `${baseUrl}/dashboard/settings/billing?canceled=true`
+      const successUrl = `${baseUrl}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${baseUrl}/settings?canceled=true`
 
       const checkout = await CheckoutService.createSubscriptionCheckout(
         dbUser.id,
@@ -160,8 +160,8 @@ export async function PUT(request: NextRequest) {
     // For upgrades to paid plans, use checkout
     if (useCheckout && plan !== 'STANDARD') {
       const baseUrl = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL
-      const successUrl = `${baseUrl}/dashboard/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`
-      const cancelUrl = `${baseUrl}/dashboard/settings/billing?canceled=true`
+      const successUrl = `${baseUrl}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${baseUrl}/settings?canceled=true`
 
       const checkout = await CheckoutService.createUpgradeCheckout(
         dbUser.id,

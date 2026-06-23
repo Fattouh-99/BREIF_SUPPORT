@@ -236,7 +236,9 @@ export const onRejectInvitation = async (token: string) => {
 export const onGetTeamMembers = async () => {
   try {
     const { userId } = await auth()
-    if (!userId) throw new Error('Unauthorized')
+    if (!userId) {
+      return { success: false, error: 'User not authenticated', team: null, members: [] }
+    }
 
     // First get the user and their team info
     const currentUser = await client.user.findUnique({

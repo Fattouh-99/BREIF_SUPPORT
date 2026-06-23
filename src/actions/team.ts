@@ -649,7 +649,7 @@ export async function onGetTeamMembers() {
   try {
     const user = await currentUser()
     if (!user) {
-      return { success: false, error: 'User not authenticated' }
+      return { success: false, error: 'User not authenticated', team: null, members: [] }
     }
     
     const dbUser = await client.user.findUnique({

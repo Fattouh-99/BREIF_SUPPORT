@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { AlertTriangle, Zap, TrendingUp } from 'lucide-react'
 import { useSubscription } from '@/hooks/stripe/use-subscription'
 import { cn } from '@/lib/utils'
+import { SUPPORT_EMAIL } from '@/constants/support'
 
 export const UsageAlert = () => {
   const { subscriptionDetails, loading, upgradeSubscription } = useSubscription()
@@ -84,7 +85,7 @@ export const UsageAlert = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.open('/dashboard/settings', '_blank')}
+                  onClick={() => window.open('/settings', '_blank')}
                 >
                   View Details
                 </Button>
@@ -96,14 +97,14 @@ export const UsageAlert = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.open('mailto:support@briefsupport.com?subject=Usage-based billing inquiry', '_blank')}
+                  onClick={() => window.open(`mailto:${SUPPORT_EMAIL}?subject=Usage-based billing inquiry`, '_blank')}
                 >
                   Contact Support for Usage-based Pricing
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.open('/dashboard/settings', '_blank')}
+                  onClick={() => window.open('/settings', '_blank')}
                 >
                   View Details
                 </Button>

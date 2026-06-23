@@ -15,10 +15,19 @@ export async function GET(
       return ApiError.Unauthorized()
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { clerkId: user.id },
+      select: { id: true },
+    })
+
+    if (!dbUser) {
+      return ApiError.NotFound('User not found')
+    }
+
     const domain = await prisma.domain.findUnique({
       where: {
         id: params.id,
-        userId: user.id,
+        userId: dbUser.id,
       },
       include: {
         chatBot: true,

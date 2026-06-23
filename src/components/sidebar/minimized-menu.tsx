@@ -44,7 +44,7 @@ export const MinMenu = ({
           {userType === UserRole.SUPER_ADMIN ? (
             <>
               {SIDE_BAR_MENU
-                .filter(menu => !menu.adminOnly && ['Dashboard', 'Settings'].includes(menu.label))
+                .filter(menu => !menu.adminOnly && ['Conversations', 'Settings'].includes(menu.label))
                 .map((menu, key) => (
                   <MenuItem
                     size="min"
@@ -73,7 +73,7 @@ export const MinMenu = ({
             SIDE_BAR_MENU
               .filter(menu => {
                 if (userType === UserRole.MEMBER) {
-                  return ['Dashboard', 'Conversations', 'Settings'].includes(menu.label);
+                  return ['Conversations', 'Settings'].includes(menu.label);
                 }
                 
                 return !(menu.adminOnly && userType !== UserRole.SUPER_ADMIN)

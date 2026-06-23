@@ -35,7 +35,6 @@ export const MaintenanceBanner = () => {
   // Check if the current page is a private page (dashboard, admin, etc.)
   // Based on the project's routing structure and middleware configuration
   const isPrivatePage = 
-    pathname?.includes('/dashboard') || 
     pathname?.includes('/team') || 
     pathname?.includes('/settings') || 
     pathname?.includes('/admin') || 

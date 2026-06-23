@@ -203,7 +203,7 @@ export default function NotificationsPage() {
         router.push(`/settings/${domainId}`)
       } else if (type === 'TEAM_MESSAGE') {
         await markAsRead(id)
-        router.push('/dashboard')
+        router.push('/conversation')
       } else {
         await markAsRead(id)
       }

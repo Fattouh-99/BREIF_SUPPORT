@@ -1,5 +1,5 @@
 import { onAiChatBotAssistant, onGetCurrentChatBot } from '@/actions/bot/index'
-import { postToParent, loadChatFromStorage, saveChatToStorage, clearChatStorage } from '@/lib/utils'
+import { postToParent, loadChatFromStorage, saveChatToStorage, clearChatStorage, isStoredChatUsable } from '@/lib/utils'
 import { pusherClient } from '@/lib/pusher'
 import { onRealTimeChat } from '@/actions/conversation'
 import {
@@ -7,9 +7,8 @@ import {
   ChatBotMessageSchema,
 } from '@/schemas/conversation.schema'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { UploadClient } from '@uploadcare/upload-client'
-import crypto from 'crypto'
 import { generateUUID } from '@/lib/uuid'
 
 import { useForm } from 'react-hook-form'
@@ -130,6 +129,57 @@ type RealTimeData = {
   supportAgent?: {
     name: string;
     role?: string;
+  }
+}
+
+type AiChatResponse = {
+  response: { role: string; content: string }
+  live?: boolean
+  chatRoom?: string
+  supportAgent?: { name: string; role?: string }
+}
+
+const syncLiveChatMessages = async (
+  chatRoomId: string,
+  setChats: Dispatch<SetStateAction<ChatMessage[]>>
+) => {
+  try {
+    const response = await fetch(
+      `/api/conversations/status?chatRoomId=${encodeURIComponent(chatRoomId)}&includeMessages=true`
+    )
+    if (!response.ok) return
+
+    const data = await response.json()
+    if (!Array.isArray(data.messages) || data.messages.length === 0) return
+
+    setChats((prev) => {
+      const merged = [...prev]
+
+      for (const msg of data.messages) {
+        const exists = merged.some(
+          (existing) =>
+            existing.id === msg.id ||
+            (existing.content === msg.message && existing.role === msg.role)
+        )
+
+        if (!exists) {
+          merged.push({
+            id: msg.id,
+            role: msg.role,
+            content: msg.message,
+            createdAt: new Date(msg.createdAt),
+          })
+        }
+      }
+
+      return merged.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return timeA - timeB
+      })
+    })
+  } catch (error) {
+    console.error('[CUSTOMER DEBUG] Failed to sync live chat messages:', error)
   }
 }
 
@@ -265,6 +315,32 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
   const [isTyping, setIsTyping] = useState<boolean>(false)
   const [typingAgent, setTypingAgent] = useState<{ name: string; role?: string } | null>(null)
   const [chatSession, setChatSession] = useState<string | null>(null)
+  const lastChatRoomRef = useRef<string | null>(null)
+
+  const restoreStoredChatSession = (storedChat: NonNullable<ReturnType<typeof loadChatFromStorage>>) => {
+    setOnChats(storedChat.messages)
+
+    const roomId =
+      storedChat.chatRoom && storedChat.chatRoom !== 'pending'
+        ? storedChat.chatRoom
+        : null
+
+    if (roomId) {
+      lastChatRoomRef.current = roomId
+      setOnRealTime({
+        chatroom: roomId,
+        mode: Boolean(storedChat.isRealtime),
+        supportAgent: storedChat.supportAgent,
+      })
+      void syncLiveChatMessages(roomId, setOnChats)
+    } else if (storedChat.isRealtime && storedChat.chatRoom) {
+      setOnRealTime({
+        chatroom: storedChat.chatRoom,
+        mode: storedChat.isRealtime,
+        supportAgent: storedChat.supportAgent,
+      })
+    }
+  }
 
   // Ensure we have a persistent chat session ID
   useEffect(() => {
@@ -281,32 +357,39 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
 
   // Function to reset the chat state completely
   const resetChatState = () => {
-    // Clear localStorage
-    clearChatStorage();
-    // Reset chat messages to empty array
+    clearChatStorage(currentBotId);
     setOnChats([]);
-    // Reset realtime mode
     setOnRealTime(undefined);
-    // Force reload the initial bot configuration
+    lastChatRoomRef.current = null
     if (currentBotId) {
       onGetDomainChatBot(currentBotId);
     }
   };
 
-  // Load chat from storage on initial mount
-  useEffect(() => {
-    const storedChat = loadChatFromStorage();
-    if (storedChat) {
-      setOnChats(storedChat.messages);
-      if (storedChat.chatRoom && storedChat.isRealtime) {
-        setOnRealTime({
-          chatroom: storedChat.chatRoom,
-          mode: storedChat.isRealtime,
-          supportAgent: storedChat.supportAgent
-        });
+  const startNewConversation = () => {
+    clearChatStorage(currentBotId)
+    lastChatRoomRef.current = null
+    hadLiveSessionRef.current = false
+    setOnRealTime(undefined)
+
+    const welcomeMessage = currentBot?.chatBot?.welcomeMessage || null
+    const greetingMessages = createWelcomeMessages(parseGreetingMessages(welcomeMessage))
+    setOnChats(greetingMessages)
+
+    if (currentBotId) {
+      try {
+        saveChatToStorage('pending', greetingMessages, false, undefined, currentBotId)
+      } catch (error) {
+        console.warn('Could not save new conversation to storage:', error)
       }
     }
-  }, []);
+  }
+
+  useEffect(() => {
+    if (onRealTime?.chatroom) {
+      lastChatRoomRef.current = onRealTime.chatroom
+    }
+  }, [onRealTime?.chatroom])
 
   // Save chat to storage whenever it changes
   useEffect(() => {
@@ -314,10 +397,11 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       // Always attempt to save chats if we have any messages
       if (onChats.length > 0) {
         saveChatToStorage(
-          onRealTime?.chatroom || 'pending',
+          onRealTime?.chatroom || lastChatRoomRef.current || 'pending',
           onChats,
           onRealTime?.mode || false,
-          onRealTime?.supportAgent
+          onRealTime?.supportAgent,
+          currentBotId
         );
       }
     } catch (error) {
@@ -326,24 +410,35 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       setTimeout(() => {
         try {
           saveChatToStorage(
-            onRealTime?.chatroom || 'pending',
+            onRealTime?.chatroom || lastChatRoomRef.current || 'pending',
             onChats,
             onRealTime?.mode || false,
-            onRealTime?.supportAgent
+            onRealTime?.supportAgent,
+            currentBotId
           );
         } catch (retryError) {
           console.error('Failed to save chat even after retry:', retryError);
         }
       }, 1000);
     }
-  }, [onChats, onRealTime]);
+  }, [onChats, onRealTime, currentBotId]);
 
-  // Only clear storage when chat is explicitly ended
+  // Keep chat history when live mode ends (do not wipe local storage)
+  const hadLiveSessionRef = useRef(false)
   useEffect(() => {
-    if (onRealTime === undefined) {
-      clearChatStorage();
+    if (onRealTime?.mode && onRealTime.chatroom) {
+      hadLiveSessionRef.current = true
+      return
     }
-  }, [onRealTime]);
+
+    if (hadLiveSessionRef.current && !onRealTime?.mode) {
+      const roomId = lastChatRoomRef.current
+      if (onChats.length > 0 && roomId && currentBotId) {
+        saveChatToStorage(roomId, onChats, false, onRealTime?.supportAgent, currentBotId)
+      }
+      hadLiveSessionRef.current = false
+    }
+  }, [onRealTime?.mode, onRealTime?.chatroom, onChats, currentBotId, onRealTime?.supportAgent]);
 
   const onScrollToBottom = () => {
     messageWindowRef.current?.scroll({
@@ -361,7 +456,7 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
   const [isMinimized, setIsMinimized] = useState(false);
 
   // Track previous dimensions to prevent unnecessary updates
-  const prevDimensionsRef = useRef<{width?: number | string, height?: number | string}>({});
+  const prevDimensionsRef = useRef<{width?: number | string, height?: number | string, open?: boolean}>({});
   // Track if message listener has been set up to prevent duplicate event listeners
   const messageListenerSetupRef = useRef(false);
 
@@ -379,35 +474,39 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
     const updateSize = () => {
       let width: number;
       let height: number;
-      
-      if (isMinimized) {
-        // When minimized, use small chat bar dimensions
+      let open: boolean;
+
+      if (!botOpened) {
+        // Collapsed bubble button
+        width = 80;
+        height = 80;
+        open = false;
+      } else if (isMinimized) {
         width = 280;
         height = 60;
+        open = true;
       } else {
-        // When open, use standard chatbot dimensions
-        // The embed code will handle mobile full-screen mode
-        width = 400;
-        height = 600;
+        width = 450;
+        height = 670;
+        open = true;
       }
-      
-      // Compare with previous dimensions to avoid unnecessary updates
+
       const prevWidth = prevDimensionsRef.current.width;
       const prevHeight = prevDimensionsRef.current.height;
-      
-      if (width === prevWidth && height === prevHeight) {
-        return; // No change, skip update
+      const prevOpen = prevDimensionsRef.current.open;
+
+      if (width === prevWidth && height === prevHeight && open === prevOpen) {
+        return;
       }
-      
-      // Update the ref with new dimensions
-      prevDimensionsRef.current = { width, height };
-      
-      // Send the update - let the embed code determine mobile behavior
+
+      prevDimensionsRef.current = { width, height, open };
+
       try {
         postToParent(
           JSON.stringify({
             width,
             height,
+            open,
           })
         );
       } catch (error) {
@@ -415,23 +514,19 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       }
     };
 
-    // Create a debounced version of updateSize
     const debouncedUpdateSize = debounce(updateSize, 150);
-    
-    // Initial update - slightly delayed to ensure stability
+
     const initialUpdateTimeout = setTimeout(() => {
       debouncedUpdateSize();
     }, 100);
-    
-    // Add resize listener for responsiveness
+
     window.addEventListener('resize', debouncedUpdateSize);
-    
-    // Cleanup
+
     return () => {
       window.removeEventListener('resize', debouncedUpdateSize);
       clearTimeout(initialUpdateTimeout);
     };
-  }, [botOpened, isMinimized, debounce]);
+  }, [botOpened, isMinimized, currentBotId, currentBot, debounce]);
 
   // Function to toggle minimized state
   const handleMinimize = () => {
@@ -456,43 +551,33 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
     if (chatbot) {
       console.log('Chatbot data received:', chatbot);
       // Check if we have stored messages before setting welcome message
-      const storedChat = loadChatFromStorage();
-      
-      // Check if stored chat has a valid welcome message that doesn't contain email/live support references
-      const hasValidStoredChat = storedChat && 
-                                storedChat.messages.length > 0 && 
-                                !(storedChat.messages[0].content.includes('email address') && 
-                                  storedChat.messages[0].content.includes('live support'));
+      const storedChat = loadChatFromStorage(id);
+      const hasValidStoredChat = storedChat && isStoredChatUsable(storedChat.messages);
+      let welcomeMessages: ChatMessage[] | null = null;
       
       if (hasValidStoredChat) {
         console.log('Using stored chat messages');
-        setOnChats(storedChat.messages);
-        if (storedChat.isRealtime) {
-          setOnRealTime({
-            chatroom: storedChat.chatRoom,
-            mode: storedChat.isRealtime,
-            supportAgent: storedChat.supportAgent
-          });
-        }
+        restoreStoredChatSession(storedChat);
       } else {
         console.log('Creating fresh welcome messages');
-        // Parse greeting messages from welcomeMessage field
         const welcomeMessage = ('chatBot' in chatbot && chatbot.chatBot?.welcomeMessage) || null;
         const greetingMessages = parseGreetingMessages(welcomeMessage);
-        const welcomeMessages = createWelcomeMessages(greetingMessages);
+        welcomeMessages = createWelcomeMessages(greetingMessages);
         
         setOnChats(welcomeMessages);
-        
-        // Clear any previous chat data
-        clearChatStorage();
-        
-        // Save the initial welcome messages to storage
-        saveChatToStorage('pending', welcomeMessages, false);
+        clearChatStorage(id);
       }
       
-      // Safely cast to CurrentBot after validation
       setCurrentBot(chatbot as unknown as CurrentBot);
       setLoading(false);
+
+      if (welcomeMessages) {
+        try {
+          saveChatToStorage('pending', welcomeMessages, false, undefined, id);
+        } catch (saveError) {
+          console.warn('Could not save chat to storage:', saveError);
+        }
+      }
     }
   };
 
@@ -503,14 +588,30 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       // Handle both old format (string) and new format (object with testing flag)
       let botid: string;
       let isTestMode = false;
-      
-      if (typeof e.data === 'string' && e.data.length > 10) {
-        botid = e.data;
-      } else if (typeof e.data === 'object' && e.data.type === 'INIT_CHATBOT') {
+
+      if (typeof e.data === 'string') {
+        if (e.data === 'GET_BOT_ID' || e.data === 'REFRESH_CHATBOT') {
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed && (parsed.width || parsed.type)) {
+            return;
+          }
+        } catch {
+          // Not JSON - continue as plain bot ID string
+        }
+
+        if (e.data.length > 10) {
+          botid = e.data;
+        } else {
+          return;
+        }
+      } else if (typeof e.data === 'object' && e.data?.type === 'INIT_CHATBOT') {
         botid = e.data.domainId;
         isTestMode = e.data.testing || false;
       } else {
-        console.log('Invalid bot ID received:', e.data);
         return;
       }
       
@@ -640,53 +741,37 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
         
         if (chatbot) {
           // Check if we have stored messages before setting welcome message
-          const storedChat = loadChatFromStorage();
-          
-          // Check if stored chat has a valid welcome message that doesn't contain email/live support references
-          const hasValidStoredChat = storedChat && 
-                                    storedChat.messages.length > 0 && 
-                                    !(storedChat.messages[0].content.includes('email address') && 
-                                      storedChat.messages[0].content.includes('live support'));
+          const storedChat = loadChatFromStorage(currentBotId);
+          const hasValidStoredChat = storedChat && isStoredChatUsable(storedChat.messages);
+          let welcomeMessages: ChatMessage[] | null = null;
           
           if (hasValidStoredChat) {
             console.log('Using stored chat messages');
-            setOnChats(storedChat.messages);
-            if (storedChat.isRealtime) {
-              setOnRealTime({
-                chatroom: storedChat.chatRoom,
-                mode: storedChat.isRealtime,
-                supportAgent: storedChat.supportAgent
-              });
-            }
+            restoreStoredChatSession(storedChat);
           } else {
             console.log('Creating fresh welcome messages');
-            // Parse greeting messages from welcomeMessage field
             const welcomeMessage = (chatbot && 'chatBot' in chatbot && chatbot.chatBot?.welcomeMessage) || null;
             const greetingMessages = parseGreetingMessages(welcomeMessage);
-            const welcomeMessages = createWelcomeMessages(greetingMessages);
+            welcomeMessages = createWelcomeMessages(greetingMessages);
             
             setOnChats(welcomeMessages);
-            
-            // Clear any previous chat data
-            clearChatStorage();
-            
-            // Save the initial welcome messages to storage
-            saveChatToStorage('pending', welcomeMessages, false);
+            clearChatStorage(currentBotId);
           }
-          
-          // Safely cast to CurrentBot after validation
+
           setCurrentBot(chatbot as unknown as CurrentBot);
           setLoading(false);
+
+          if (welcomeMessages) {
+            try {
+              saveChatToStorage('pending', welcomeMessages, false, undefined, currentBotId);
+            } catch (saveError) {
+              console.warn('Could not save chat to storage:', saveError);
+            }
+          }
         }
       } catch (error) {
         console.error('Error getting chatbot data:', error);
-        
-        // In case of error, set a fallback welcome message
-        const fallbackMessage: ChatMessage = {
-          role: 'assistant',
-          content: 'Sorry, there was an error loading this chatbot. Please try again later.',
-        };
-        setOnChats([fallbackMessage]);
+        clearChatStorage(currentBotId);
         setLoading(false);
       }
     };
@@ -736,6 +821,8 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
           mode: true,
           supportAgent: data.supportAgent || { name: 'Support Agent', role: 'support' }
         });
+
+        void syncLiveChatMessages(onRealTime.chatroom, setOnChats)
         
         // Also add a system message if not already added
         const systemMessage: ChatMessage = {
@@ -822,6 +909,12 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       safeUnsubscribe(channelName);
     };
   }, [onRealTime?.chatroom]);
+
+  // Sync server messages when live mode becomes active
+  useEffect(() => {
+    if (!onRealTime?.chatroom || !onRealTime.mode) return
+    void syncLiveChatMessages(onRealTime.chatroom, setOnChats)
+  }, [onRealTime?.chatroom, onRealTime?.mode]);
 
   // Effect to handle real-time messages
   useEffect(() => {
@@ -953,21 +1046,30 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       createdAt: new Date()
     };
 
+    const emailMatch = values.content.match(
+      /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/
+    )
+    if (emailMatch?.[0]) {
+      localStorage.setItem('customer_email', emailMatch[0])
+    }
+
     // Add user message locally first
     setOnChats((prev) => [...prev, userMessage]);
+    const chatWithUserMessage = [...onChats, userMessage]
 
     try {
       if (!onRealTime?.mode) {
         setOnAiTyping(true);
         const response = await onAiChatBotAssistant(
           currentBotId,
-          onChats,
+          chatWithUserMessage,
           'user',
           values.content
         );
 
-        if (response && typeof response === 'object' && 'message' in response) {
-          const messageData = response.message as { role: string; content: string };
+        if (response && typeof response === 'object' && 'response' in response) {
+          const aiResponse = response as AiChatResponse
+          const messageData = aiResponse.response
           const botMessage = {
             id: generateUUID(),
             role: messageData.role as 'user' | 'assistant',
@@ -976,12 +1078,41 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
             createdAt: new Date()
           };
 
-          setOnChats((prev) => [...prev, botMessage]);
-          
-          // Save updated conversation to storage
-          saveChatToStorage('pending', [...onChats, userMessage, botMessage], false);
+          const updatedMessages = [...chatWithUserMessage, botMessage]
+          setOnChats(updatedMessages);
+
+          if (aiResponse.live && aiResponse.chatRoom) {
+            setOnRealTime({
+              chatroom: aiResponse.chatRoom,
+              mode: true,
+              supportAgent: aiResponse.supportAgent || {
+                name: 'Support Agent',
+                role: 'support',
+              },
+            })
+
+            try {
+              saveChatToStorage(
+                aiResponse.chatRoom,
+                updatedMessages,
+                true,
+                aiResponse.supportAgent,
+                currentBotId
+              )
+            } catch (saveError) {
+              console.warn('Could not save live chat to storage:', saveError)
+            }
+
+            lastChatRoomRef.current = aiResponse.chatRoom
+            void syncLiveChatMessages(aiResponse.chatRoom, setOnChats)
+          } else {
+            try {
+              saveChatToStorage('pending', updatedMessages, false, undefined, currentBotId);
+            } catch (saveError) {
+              console.warn('Could not save chat to storage:', saveError);
+            }
+          }
         }
-        setOnAiTyping(false);
       } else {
         // In real-time mode, use the server-side API endpoint instead of direct Pusher calls
         // This prevents CORS issues completely
@@ -1010,7 +1141,6 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      // Show error to user
       setOnChats((prev) => [
         ...prev,
         {
@@ -1020,6 +1150,8 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
           createdAt: new Date()
         }
       ]);
+    } finally {
+      setOnAiTyping(false);
     }
   });
 
@@ -1040,6 +1172,7 @@ export const useChatBot = ({ isPublic = false }: UseChatBotOptions = {}) => {
     isTyping,
     typingAgent,
     resetChatState,
+    startNewConversation,
     handleMinimize
   }
 }

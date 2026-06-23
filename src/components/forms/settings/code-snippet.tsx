@@ -2,8 +2,13 @@
 import Section from '@/components/section-label'
 import { useToast } from '@/components/ui/use-toast'
 import { Copy } from 'lucide-react'
-import React, { useState } from 'react'
+import React from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  getChatbotEmbedScript,
+  getReactChatbotEmbedComponent,
+} from '@/lib/chatbot-embed-snippet'
+import { getChatbotBaseUrl, isLocalChatbotUrl } from '@/lib/chatbot-base-url'
 
 type Props = {
   id: string
@@ -11,198 +16,12 @@ type Props = {
 
 const CodeSnippet = ({ id }: Props) => {
   const { toast } = useToast()
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.briefsupport.com'
-  
-  const vanillaSnippet = `
-// Simple chatbot iframe embed
-(function() {
-  // Prevent multiple initializations
-  if (window.chatbotInitialized) return;
-  window.chatbotInitialized = true;
-  
-  // Create the iframe that loads your chatbot
-  const iframe = document.createElement('iframe');
-  iframe.src = '${baseUrl}/chatbot';
-  iframe.style.cssText = \`
-        position: fixed;
-    bottom: 20px;
-    right: 20px;
-        width: 60px;
-        height: 60px;
-    border: none;
-    border-radius: 12px;
-    z-index: 999998;
-    background: transparent;
-    pointer-events: none;
-    opacity: 0;
-    transition: all 0.3s ease;
-  \`;
-  iframe.id = 'chatbot-iframe';
-  
-  // Add iframe to page
-  document.body.appendChild(iframe);
-  
-  // Send bot ID when iframe loads
-  iframe.onload = () => {
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.postMessage('${id}', '${baseUrl}');
-      } catch (e) {
-        console.log('Could not send message to iframe');
-    }
-    }, 100);
-  };
-  
-  // Listen for size updates from the chatbot iframe
-  window.addEventListener('message', (e) => {
-    // Allow messages from both briefsupport.com and www.briefsupport.com
-    const allowedOrigins = ['${baseUrl}', 'https://briefsupport.com', 'https://www.briefsupport.com'];
-    if (!allowedOrigins.includes(e.origin)) return;
-    
-    try {
-      const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-      
-      if (data.width && data.height) {
-        const isMobile = window.innerWidth < 768;
-        
-        iframe.style.opacity = '1';
-        iframe.style.pointerEvents = 'auto';
-        
-        if (isMobile) {
-          // Full screen on mobile when open
-          iframe.style.top = '0';
-          iframe.style.left = '0';
-          iframe.style.bottom = '0';
-          iframe.style.right = '0';
-          iframe.style.width = '100%';
-          iframe.style.height = '100%';
-          iframe.style.borderRadius = '0';
-        } else {
-          // Use provided dimensions on desktop
-          iframe.style.width = data.width + 'px';
-          iframe.style.height = data.height + 'px';
-          iframe.style.top = 'auto';
-          iframe.style.left = 'auto';
-          iframe.style.borderRadius = '12px';
-        }
-      }
-    } catch (err) {
-      // Ignore parsing errors
-    }
-  });
-})();
-  `;
-  
-  const reactSnippet = `
-import { useEffect, useRef } from 'react';
+  const baseUrl = getChatbotBaseUrl()
+  const isDevEmbed = isLocalChatbotUrl(baseUrl)
 
-// Simple chatbot iframe component for React
-export function ChatbotEmbed() {
-  const iframeRef = useRef(null);
-  
-  useEffect(() => {
-    // Prevent multiple initializations
-    if (window.chatbotInitialized) return;
-    window.chatbotInitialized = true;
-    
-    // Create the iframe that loads your chatbot
-    const iframe = document.createElement('iframe');
-    iframe.src = '${baseUrl}/chatbot';
-    iframe.style.cssText = \`
-          position: fixed;
-      bottom: 20px;
-      right: 20px;
-          width: 60px;
-          height: 60px;
-      border: none;
-      border-radius: 12px;
-      z-index: 999998;
-      background: transparent;
-      pointer-events: none;
-      opacity: 0;
-      transition: all 0.3s ease;
-    \`;
-    iframe.id = 'chatbot-iframe';
-    
-    // Add iframe to page
-    document.body.appendChild(iframe);
-    iframeRef.current = iframe;
-    
-    // Send bot ID when iframe loads
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow.postMessage('${id}', '${baseUrl}');
-        } catch (e) {
-          console.log('Could not send message to iframe');
-        }
-      }, 100);
-    };
-    
-    // Listen for size updates from the chatbot iframe
-    const handleMessage = (e) => {
-      // Allow messages from both briefsupport.com and www.briefsupport.com
-      const allowedOrigins = ['${baseUrl}', 'https://briefsupport.com', 'https://www.briefsupport.com'];
-      if (!allowedOrigins.includes(e.origin)) return;
-      
-      try {
-        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        
-        if (data.width && data.height) {
-          const isMobile = window.innerWidth < 768;
-          
-          iframe.style.opacity = '1';
-          iframe.style.pointerEvents = 'auto';
-          
-          if (isMobile) {
-            // Full screen on mobile when open
-            iframe.style.top = '0';
-            iframe.style.left = '0';
-            iframe.style.bottom = '0';
-            iframe.style.right = '0';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.borderRadius = '0';
-          } else {
-            // Use provided dimensions on desktop
-            iframe.style.width = data.width + 'px';
-            iframe.style.height = data.height + 'px';
-            iframe.style.top = 'auto';
-            iframe.style.left = 'auto';
-            iframe.style.borderRadius = '12px';
-          }
-        }
-      } catch (err) {
-        // Ignore parsing errors
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    };
-  }, []);
-  
-  // This component doesn't render anything visible
-  return null;
-}
+  const vanillaSnippet = getChatbotEmbedScript(id, baseUrl)
+  const reactSnippet = getReactChatbotEmbedComponent(id, baseUrl)
 
-// Usage example:
-// import { ChatbotEmbed } from './ChatbotEmbed';
-//
-// function App() {
-//   return (
-//     <div>
-//       <h1>Your Website</h1>
-//       <ChatbotEmbed />
-//     </div>
-//   );
-// }
-  `;
-  
   const vueSnippet = `
 <!-- ChatbotEmbed.vue -->
 <template>
@@ -212,106 +31,9 @@ export function ChatbotEmbed() {
 <script>
 export default {
   name: 'ChatbotEmbed',
-  data() {
-    return {
-      iframe: null
-    }
-  },
   mounted() {
-    this.initChatbot()
+    ${getChatbotEmbedScript(id, baseUrl)}
   },
-  methods: {
-    initChatbot() {
-      // Prevent multiple initializations
-      if (window.chatbotInitialized) return
-      window.chatbotInitialized = true
-      
-      // Create the iframe that loads your chatbot
-      const iframe = document.createElement('iframe')
-      iframe.src = '${baseUrl}/chatbot'
-      iframe.style.cssText = \`
-            position: fixed;
-        bottom: 20px;
-        right: 20px;
-            width: 60px;
-            height: 60px;
-        border: none;
-        border-radius: 12px;
-        z-index: 999998;
-        background: transparent;
-        pointer-events: none;
-        opacity: 0;
-        transition: all 0.3s ease;
-      \`
-      iframe.id = 'chatbot-iframe'
-      
-      // Add iframe to page
-      document.body.appendChild(iframe)
-      this.iframe = iframe
-      
-      // Send bot ID when iframe loads
-      iframe.onload = () => {
-        setTimeout(() => {
-          try {
-            iframe.contentWindow.postMessage('${id}', '${baseUrl}')
-          } catch (e) {
-            console.log('Could not send message to iframe')
-        }
-        }, 100)
-      }
-      
-      // Listen for size updates from the chatbot iframe
-      const handleMessage = (e) => {
-        // Allow messages from both briefsupport.com and www.briefsupport.com
-        const allowedOrigins = ['${baseUrl}', 'https://briefsupport.com', 'https://www.briefsupport.com']
-        if (!allowedOrigins.includes(e.origin)) return
-        
-        try {
-          const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
-          
-          if (data.width && data.height) {
-            const isMobile = window.innerWidth < 768
-            
-            iframe.style.opacity = '1'
-            iframe.style.pointerEvents = 'auto'
-            
-            if (isMobile) {
-              // Full screen on mobile when open
-              iframe.style.top = '0'
-              iframe.style.left = '0'
-              iframe.style.bottom = '0'
-              iframe.style.right = '0'
-              iframe.style.width = '100%'
-              iframe.style.height = '100%'
-              iframe.style.borderRadius = '0'
-            } else {
-              // Use provided dimensions on desktop
-              iframe.style.width = data.width + 'px'
-              iframe.style.height = data.height + 'px'
-              iframe.style.top = 'auto'
-              iframe.style.left = 'auto'
-              iframe.style.borderRadius = '12px'
-            }
-          }
-        } catch (err) {
-          // Ignore parsing errors
-        }
-      }
-      
-      window.addEventListener('message', handleMessage)
-      
-      // Store cleanup reference
-      this.cleanup = () => {
-        window.removeEventListener('message', handleMessage)
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
-      }
-    }
-  },
-  beforeDestroy() {
-    if (this.cleanup) {
-      this.cleanup()
-    }
-  }
 }
 </script>
 
@@ -333,18 +55,22 @@ export default {
 }
 </script>
 -->
-  `;
+  `
 
   return (
     <div className="mt-5 flex flex-col gap-3 items-start w-full">
       <Section
         label="Code snippet"
-        message="Copy and paste this code snippet into your website"
+        message={
+          isDevEmbed
+            ? `Development mode: snippets point to ${baseUrl}. Start the app with npm run dev before testing embeds.`
+            : 'Copy and paste this code snippet into your website'
+        }
       />
       <Tabs defaultValue="instructions" className="w-full">
         <TabsList className="w-full flex flex-wrap gap-1">
           <TabsTrigger value="vanilla" className="flex-1 text-xs sm:text-sm">Vanilla JS</TabsTrigger>
-          <TabsTrigger value="react" className="flex-1 text-xs sm:text-sm">React</TabsTrigger>
+          <TabsTrigger value="react" className="flex-1 text-xs sm:text-sm">React (JSX)</TabsTrigger>
           <TabsTrigger value="vue" className="flex-1 text-xs sm:text-sm">Vue</TabsTrigger>
         </TabsList>
 

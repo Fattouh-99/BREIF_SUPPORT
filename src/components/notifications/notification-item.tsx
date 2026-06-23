@@ -55,7 +55,7 @@ const getNotificationAction = (type: NotificationType, metadata?: string) => {
     case 'TEAM_MESSAGE':
       return {
         label: 'View Announcement',
-        href: '/dashboard'
+        href: '/conversation'
       };
     case 'SHARED_CONVERSATION':
       if (metadata) {

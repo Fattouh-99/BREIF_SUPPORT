@@ -2,7 +2,7 @@
 
 import { client } from '@/lib/prisma'
 import { currentUser } from '@clerk/nextjs/server'
-import nodemailer from 'nodemailer'
+import { createMailTransporter, getMailFromAddress } from '@/lib/mailer'
 
 export const onGetAllCustomers = async (id: string) => {
   try {
@@ -188,17 +188,10 @@ export const onBulkMailer = async (email: string[], campaignId: string) => {
     })
 
     if (template && template.template) {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.NODE_MAILER_EMAIL,
-          pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-        },
-      })
+      const transporter = createMailTransporter()
 
       const mailOptions = {
+        from: getMailFromAddress(),
         to: email,
         subject: template.name,
         text: JSON.parse(template.template),

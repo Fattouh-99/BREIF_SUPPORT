@@ -1,5 +1,5 @@
 'use server'
-import nodemailer from 'nodemailer'
+import { formatMailError, getMailFromAddress, sendMail } from '@/lib/mailer'
 
 export const onMailer = async (
   ownerName: string,
@@ -7,20 +7,11 @@ export const onMailer = async (
   customerEmail: string,
   customerQuery: string
 ) => {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.NODE_MAILER_EMAIL,
-      pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-    },
-  })
-
-  const mailOptions = {
-    to: process.env.NODE_MAILER_EMAIL,
-    subject: `Live Support Required - ${domainName}`,
-    html: `
+  try {
+    await sendMail({
+      to: getMailFromAddress(),
+      subject: `Live Support Required - ${domainName}`,
+      html: `
       <h2>Live Support Request</h2>
       <p>Hello ${ownerName},</p>
       <p>A customer on your ${domainName} domain requires live support assistance.</p>
@@ -32,13 +23,10 @@ export const onMailer = async (
       <p>The conversation has been transferred to live chat mode. Please log in to your dashboard to assist the customer.</p>
       <p>Best regards,<br>Brief Support Team</p>
     `,
-  }
-
-  try {
-    await transporter.sendMail(mailOptions)
+    })
     return { status: 200, message: 'Email sent' }
   } catch (error) {
     console.error('Error sending support request email:', error)
-    return { status: 500, message: 'Error sending email' }
+    return { status: 500, message: formatMailError(error) }
   }
 }

@@ -3,7 +3,7 @@
 import { client } from '@/lib/prisma'
 import { currentUser } from '@clerk/nextjs/server'
 import Stripe from 'stripe'
-import nodemailer from 'nodemailer'
+import { createMailTransporter, getMailFromAddress } from '@/lib/mailer'
 import { pusherServer } from '@/lib/pusher'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET!, {
@@ -46,15 +46,7 @@ const createUpgradeNotification = async (userId: string, plan: string) => {
 };
 
 const sendUpgradeEmail = async (userEmail: string, plan: string) => {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.NODE_MAILER_EMAIL,
-      pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-    },
-  })
+  const transporter = createMailTransporter()
 
   const planDetails = {
     PRO: {
@@ -72,7 +64,7 @@ const sendUpgradeEmail = async (userEmail: string, plan: string) => {
   const featuresList = features.map(f => `  • ${f}`).join('\n')
 
   const mailOptions = {
-    from: process.env.NODE_MAILER_EMAIL,
+    from: getMailFromAddress(),
     to: userEmail,
     subject: `Welcome to Brief Support ${plan} Plan!`,
     text: `Thank you for upgrading to the ${plan} Plan!\n\nYour new features include:\n${featuresList}\n\nIf you have any questions, our support team is here to help.\n\nBest regards,\nThe Brief Support Team`,

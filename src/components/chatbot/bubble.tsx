@@ -1,5 +1,5 @@
 import React, { useState, useMemo, memo } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, formatMoney } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { User, ChevronRight, ImageIcon, Bot, Check } from 'lucide-react'
 import Image from 'next/image'
@@ -492,12 +492,12 @@ const Bubble = ({ message, themeColor, textColor, bubbleBackground, allowDarkMod
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold">
                             ${product.hasDiscount && product.discountedPrice
-                              ? product.discountedPrice.toFixed(2)
-                              : product.price.toFixed(2)}
+                              ? formatMoney(product.discountedPrice)
+                              : formatMoney(product.price)}
                           </p>
                           {product.hasDiscount && product.discountedPrice && (
                             <p className="text-xs line-through opacity-70">
-                              ${product.price.toFixed(2)}
+                              ${formatMoney(product.price)}
                             </p>
                           )}
                         </div>

@@ -1,234 +1,133 @@
 'use client'
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect } from 'react'
+import { getChatbotBaseUrl } from '@/lib/chatbot-base-url'
 
 interface ChatbotEmbedProps {
   botId: string
   baseUrl?: string
 }
 
-export function ChatbotEmbed({ 
-  botId = '58749ce2-e899-4a48-8b21-af8fca50b206',
-  baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://localhost:3000'
+/**
+ * Drop-in React embed component for customer websites.
+ * Mount once in your app root (e.g. layout or App.tsx).
+ */
+export function ChatbotEmbed({
+  botId,
+  baseUrl = getChatbotBaseUrl(),
 }: ChatbotEmbedProps) {
-  // Reference to track if the component is mounted
-  const isMountedRef = useRef<boolean>(false);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [isOpen, setIsOpen] = useState<boolean>(false); // Start closed to prevent flash
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if ((window as Window & { chatbotInitialized?: boolean }).chatbotInitialized) return
+    ;(window as Window & { chatbotInitialized?: boolean }).chatbotInitialized = true
 
-  // Memoized debounce function with proper cleanup
-  const debounce = useCallback((func: Function, delay: number) => {
-    let timeoutId: NodeJS.Timeout;
-    return (...args: any[]) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
-    };
-  }, []);
-  
-  // Detect Safari browser
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Add Safari detection
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isSafari) {
-      document.documentElement.classList.add('safari');
-      
-      // Add CSS for Safari fix
-      const linkElement = document.createElement('link');
-      linkElement.rel = 'stylesheet';
-      linkElement.href = `${baseUrl}/chatbot-embed.css`;
-      document.head.appendChild(linkElement);
-      
-      // Add page-loaded class after everything is loaded
-      if (document.readyState === 'complete') {
-        document.documentElement.classList.add('page-loaded');
-      } else {
-        window.addEventListener('load', () => {
-          document.documentElement.classList.add('page-loaded');
-        });
-      }
-    }
-    
-    return () => {
-      if (isSafari) {
-        document.documentElement.classList.remove('safari');
-        document.documentElement.classList.remove('page-loaded');
-        
-        // Remove CSS link if it exists
-        const linkElement = document.querySelector('link[href$="/chatbot-embed.css"]');
-        if (linkElement) {
-          document.head.removeChild(linkElement);
-        }
-      }
-    };
-  }, [baseUrl]);
-  
-  // Main initialization effect - simplified to reduce layout shifts
-  useEffect(() => {
-    // Only run in browser environment
-    if (typeof window === 'undefined') return;
-        
-    // Set mounted flag
-    isMountedRef.current = true;
-    
-    // Get existing container from page
-    const containerElement = document.getElementById('chatbot-root');
-    if (!containerElement) {
-      console.error('Chatbot container not found');
-      return;
-    }
-    
-    // Apply initial styles to prevent flash in Safari
-    containerElement.style.width = '60px';
-    containerElement.style.height = '60px';
-    containerElement.style.opacity = '0';
-    containerElement.style.pointerEvents = 'none';
-    containerElement.style.background = 'transparent';
-    containerElement.style.transition = 'opacity 0.3s ease, width 0.3s ease, height 0.3s ease';
-    containerElement.style.position = 'relative';
-    containerElement.style.overflow = 'hidden';
-    
-    // Create and append iframe
-    const iframe = document.createElement('iframe');
-    iframe.src = `${baseUrl}/chatbot`;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.background = 'transparent';
-    iframe.style.backgroundColor = 'transparent';
-    iframe.style.border = 'none';
-    iframe.style.opacity = '0'; // Start hidden to prevent flash
-    
-    // Listen for iframe load
-    iframe.onload = () => {
-      if (iframe.contentWindow) {
-        // Send bot ID to iframe
-        iframe.contentWindow.postMessage(botId, baseUrl);
-        
-        // Fade in iframe once loaded
-        setTimeout(() => {
-          iframe.style.opacity = '1';
-          iframe.style.transition = 'opacity 0.3s ease';
-          
-          // Mark as initialized which allows toggling
-          setIsInitialized(true);
-          
-          // Add ready class for CSS transitions
-          containerElement.classList.add('chatbot-ready');
-          
-          // Reveal container if manually set to open
-          if (isOpen) {
-            containerElement.style.opacity = '1';
-            containerElement.style.pointerEvents = 'auto';
-          }
-        }, 300);
-      }
-    };
-    
-    containerElement.appendChild(iframe);
-    iframeRef.current = iframe;
-    
-    // Create message handler - simplified for better performance
-    const handleMessage = debounce((e: MessageEvent) => {
-      if (!isMountedRef.current || !iframe.contentWindow) return;
-      
+    const CHATBOT_DOMAIN_ID = botId
+    const CHATBOT_BASE_URL = baseUrl.replace(/\/$/, '')
+
+    const iframe = document.createElement('iframe')
+    iframe.src = `${CHATBOT_BASE_URL}/chatbot`
+    iframe.id = 'chatbot-iframe'
+    iframe.title = 'Brief Support Chat'
+    iframe.setAttribute('allow', 'clipboard-write')
+    iframe.style.cssText = [
+      'position: fixed',
+      'bottom: 20px',
+      'right: 20px',
+      'width: 80px',
+      'height: 80px',
+      'border: none',
+      'border-radius: 50%',
+      'z-index: 999998',
+      'background: transparent',
+      'pointer-events: none',
+      'opacity: 0',
+      'transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease, border-radius 0.3s ease',
+    ].join(';')
+
+    const isAllowedOrigin = (origin: string) => {
+      if (!origin) return false
       try {
-        // Validate origin
-        const originUrl = new URL(baseUrl);
-        const eventOriginUrl = e.origin ? new URL(e.origin) : null;
-        
-        if (!eventOriginUrl || originUrl.hostname !== eventOriginUrl.hostname) {
-          return;
-        }
-        
-        // Send bot ID
-        setTimeout(() => {
-          if (iframe.contentWindow) {
-            iframe.contentWindow.postMessage(botId, baseUrl);
-          }
-        }, 300);
-      } catch (error) {
-        console.error('Error handling message:', error);
+        const eventHost = new URL(origin).hostname.replace(/^www\./, '')
+        const baseHost = new URL(CHATBOT_BASE_URL).hostname.replace(/^www\./, '')
+        if (eventHost === baseHost) return true
+        if (eventHost === 'localhost' || eventHost === '127.0.0.1') return true
+        return false
+      } catch {
+        return false
       }
-    }, 150);
-    
-    // Toggle function for the user's existing button
-    const toggleChatbot = () => {
-      if (!containerElement || !isInitialized) return;
-      
-      setIsOpen(prevOpen => {
-        const newOpen = !prevOpen;
-        
-        if (newOpen) {
-          // Show chatbot - apply styles with a slight delay to ensure smooth transitions
-          requestAnimationFrame(() => {
-            containerElement.style.width = '400px';
-            containerElement.style.height = '600px';
-            containerElement.style.opacity = '1';
-            containerElement.style.pointerEvents = 'auto';
-            containerElement.style.borderRadius = '12px';
-          });
-          
-          // Send bot ID to iframe
-          if (iframe.contentWindow) {
-            iframe.contentWindow.postMessage(botId, baseUrl);
-          }
-        } else {
-          // Hide chatbot
-          containerElement.style.width = '60px';
-          containerElement.style.height = '60px';
-          containerElement.style.opacity = '0';
-          containerElement.style.pointerEvents = 'none';
-          containerElement.style.borderRadius = '50%';
-        }
-        
-        return newOpen;
-      });
-    };
-    
-    // Expose toggle function globally
-    (window as any).toggleChatbot = toggleChatbot;
-    
-    // Listen for button clicks
-    const handleButtonClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('[aria-label="Open chat support"]')) {
-        toggleChatbot();
-        e.preventDefault();
-        e.stopPropagation();
+    }
+
+    const sendBotId = () => {
+      if (!iframe.contentWindow) return
+      try {
+        iframe.contentWindow.postMessage(CHATBOT_DOMAIN_ID, '*')
+      } catch {
+        console.warn('Could not send bot ID to chatbot iframe')
       }
-    };
-    
-    document.body.addEventListener('click', handleButtonClick, true);
-    window.addEventListener('message', handleMessage);
-    
-    // Clean up on unmount
+    }
+
+    const applyIframeSize = (width: number, height: number, isOpen: boolean) => {
+      iframe.style.opacity = '1'
+      iframe.style.pointerEvents = 'auto'
+
+      const isMobile = window.innerWidth < 768
+
+      if (isMobile && isOpen) {
+        iframe.style.top = '0'
+        iframe.style.left = '0'
+        iframe.style.bottom = '0'
+        iframe.style.right = '0'
+        iframe.style.width = '100%'
+        iframe.style.height = '100%'
+        iframe.style.borderRadius = '0'
+        return
+      }
+
+      iframe.style.top = 'auto'
+      iframe.style.left = 'auto'
+      iframe.style.bottom = '20px'
+      iframe.style.right = '20px'
+      iframe.style.width = `${width}px`
+      iframe.style.height = `${height}px`
+      iframe.style.borderRadius = isOpen ? '12px' : '50%'
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (!isAllowedOrigin(e.origin)) return
+
+      if (e.data === 'GET_BOT_ID') {
+        sendBotId()
+        return
+      }
+
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (data?.width && data?.height) {
+          applyIframeSize(data.width, data.height, !!data.open)
+        }
+      } catch {
+        // Ignore non-JSON messages
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    iframe.onload = () => {
+      sendBotId()
+      setTimeout(sendBotId, 250)
+      setTimeout(sendBotId, 1000)
+    }
+
+    document.body.appendChild(iframe)
+
     return () => {
-      // Set unmounted flag
-      isMountedRef.current = false;
-      
-      // Remove event listeners
-      window.removeEventListener('message', handleMessage);
-      document.body.removeEventListener('click', handleButtonClick, true);
-      delete (window as any).toggleChatbot;
-      
-      // Remove iframe
-      if (containerElement && iframeRef.current) {
-        containerElement.removeChild(iframeRef.current);
-      }
-      
-      // Remove ready class
-      if (containerElement) {
-        containerElement.classList.remove('chatbot-ready');
-      }
-      
-      iframeRef.current = null;
-    };
-  }, [botId, baseUrl, debounce, isOpen, isInitialized]);
-  
-  // This component doesn't render anything itself
-  return null;
+      window.removeEventListener('message', handleMessage)
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+      ;(window as Window & { chatbotInitialized?: boolean }).chatbotInitialized = false
+    }
+  }, [botId, baseUrl])
+
+  return null
 }
 
-export default ChatbotEmbed; 
+export default ChatbotEmbed

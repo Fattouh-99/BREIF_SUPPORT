@@ -6,6 +6,7 @@ import { MessageCircle, X, Minus, MessageSquare, Send, User } from 'lucide-react
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { SUPPORT_EMAIL } from '@/constants/support'
 import { motion } from 'framer-motion'
 
 interface FeedbackBotProps {
@@ -109,7 +110,7 @@ const websiteKnowledge = {
       advanced: ['Custom CSS', 'Event hooks', 'Multilingual support', 'Conditional display rules']
     },
     apiKey: 'You can get your API key from your Brief Support dashboard under Settings > API Keys.',
-    support: 'Our integration team is available to help with any custom integration needs at support@briefsupport.com'
+    support: `Our integration team is available to help with any custom integration needs at ${SUPPORT_EMAIL}`
   },
   
   navigation: {
@@ -143,11 +144,11 @@ const websiteKnowledge = {
       keyFeatures: ['Knowledge base', 'FAQ section', 'Contact forms'],
       commonQuestions: ['How do I contact support', 'Common issues', 'Account problems']
     },
-    'dashboard': {
-      path: '/dashboard',
-      description: 'For logged-in users to manage their account',
-      keyFeatures: ['Account settings', 'Usage statistics', 'Billing information'],
-      commonQuestions: ['How to change settings', 'Billing issues', 'Account management']
+    'conversation': {
+      path: '/conversation',
+      description: 'For logged-in users to manage live chats and customer conversations',
+      keyFeatures: ['Live conversations', 'Chat history', 'Team collaboration'],
+      commonQuestions: ['How to reply to customers', 'Live support setup', 'Conversation management']
     }
   },
   
@@ -1186,9 +1187,9 @@ Would you like more information about this plan or would you like to try it with
       return `Here's how you can reach our team:
 
 📧 EMAIL SUPPORT
-• General inquiries: support@briefsupport.com
-• Technical support: support@briefsupport.com
-• Billing questions: support@briefsupport.com
+• General inquiries: ${SUPPORT_EMAIL}
+• Technical support: ${SUPPORT_EMAIL}
+• Billing questions: ${SUPPORT_EMAIL}
 
 💬 LIVE CHAT
 • Available Monday-Friday, 9am-5pm EST
@@ -1389,56 +1390,64 @@ Would you like more details on a specific installation method?`
     setSuggestedQuestions(newSuggestions)
   }, [conversationState, generateSuggestedQuestions])
 
-  // Handle sending messages - update to accept suggested question text
-  const handleSendMessage = useCallback((e?: React.FormEvent, suggestedText?: string) => {
+  // Handle sending messages - uses real AI with local fallback
+  const handleSendMessage = useCallback(async (e?: React.FormEvent, suggestedText?: string) => {
     if (e) e.preventDefault()
     
-    // Use either the suggested text or the current message
     const messageToSend = suggestedText || message
     
     if (!messageToSend.trim()) return
     
-    // Add user message to conversation
     setConversation(prev => [...prev, {
       type: 'user',
       content: messageToSend,
       timestamp: new Date()
     }])
     
-    // Analyze user input and update conversation state
     const newState = analyzeUserInput(messageToSend, conversationState)
     newState.hasAskedQuestion = true
     newState.questionsAsked.push(messageToSend.toLowerCase())
-    
-    // Special handling for budget response to force a recommendation
-    if (newState.currentStep === 'pricing_plan_recommendation' && 
-        newState.planRecommendation.currentQuestion === 'provide_recommendation') {
-      // Generate intelligent response for recommendation
-      const response = generateResponse(messageToSend, newState)
-      
-      // Update state
-      setConversationState(newState)
-      
-      // Clear input field
-      setMessage('')
-      
-      // Simulate bot typing response
-      simulateTyping(response)
-      
-      return
-    }
-    
     setConversationState(newState)
-    
-    // Clear input field
     setMessage('')
-    
-    // Generate intelligent response
-    const response = generateResponse(messageToSend, newState)
-    
-    // Simulate bot typing response
-    simulateTyping(response)
-  }, [message, conversationState])
+    setIsTyping(true)
+
+    const history = [...conversation, {
+      type: 'user' as const,
+      content: messageToSend,
+      timestamp: new Date(),
+    }].map((msg) => ({
+      role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
+      content: msg.content,
+    }))
+
+    let response = ''
+
+    try {
+      const apiResponse = await fetch('/api/landing-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      })
+
+      if (apiResponse.ok) {
+        const data = await apiResponse.json()
+        response = data.response?.trim() || ''
+      }
+    } catch (error) {
+      console.error('[WebsiteFeedbackBot] AI request failed:', error)
+    }
+
+    if (!response) {
+      response = generateResponse(messageToSend, newState)
+    }
+
+    setIsTyping(false)
+    setConversation(prev => [...prev, {
+      type: 'bot',
+      content: response,
+      timestamp: new Date()
+    }])
+  }, [message, conversationState, conversation, generateResponse])
 
   // Handle suggestion click
   const handleSuggestionClick = useCallback((text: string) => {
@@ -1447,14 +1456,20 @@ Would you like more details on a specific installation method?`
 
   // Open the bot
   const handleOpenBot = useCallback(() => {
-    // If first time opening, add greeting
     if (conversation.length === 0) {
       setConversation([greetingMessage])
     }
     
     setIsOpen(true)
     setIsMinimized(false)
-    setShowBubble(false) // Hide bubble when bot opens
+    setShowBubble(false)
+  }, [conversation.length, greetingMessage])
+
+  const handleOpenChatTab = useCallback(() => {
+    if (conversation.length === 0) {
+      setConversation([greetingMessage])
+    }
+    setActiveTab('chat')
   }, [conversation.length, greetingMessage])
 
   // Close the bot
@@ -1570,7 +1585,7 @@ Would you like more details on a specific installation method?`
       <div className="px-6 py-4">
         <div className="grid gap-3">
           <button
-            onClick={() => setActiveTab('chat')}
+            onClick={handleOpenChatTab}
             className="hover:translate-y-[-2px] transition-all duration-300 shadow-sm group"
             style={{ 
               borderRadius: '12px',
@@ -1652,9 +1667,9 @@ Would you like more details on a specific installation method?`
             <button 
               key={index}
               onClick={() => {
-                const content = `How do I find the ${page} page?`;
-                setMessage(content);
-                handleSendMessage();
+                const content = `How do I find the ${page} page?`
+                setActiveTab('chat')
+                handleSendMessage(undefined, content)
               }}
               className="transition-all duration-200 font-medium"
               style={{ 
@@ -1683,9 +1698,9 @@ Would you like more details on a specific installation method?`
             <button 
               key={index}
               onClick={() => {
-                const content = `I'm having trouble with ${issue}`;
-                setMessage(content);
-                handleSendMessage();
+                const content = `I'm having trouble with ${issue}`
+                setActiveTab('chat')
+                handleSendMessage(undefined, content)
               }}
               className="transition-all duration-200 font-medium"
               style={{ 
@@ -1717,7 +1732,7 @@ Would you like more details on a specific installation method?`
               <p className="text-xs text-white opacity-80">I can guide you through any part of our website</p>
             </div>
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={handleOpenChatTab}
               className="px-4 py-2 rounded-lg font-medium text-sm transition-colors"
               style={{ 
                 background: 'white',

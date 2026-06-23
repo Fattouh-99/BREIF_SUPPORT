@@ -53,6 +53,24 @@ export function getMonthName(month: number): string {
   return months[month]
 }
 
+/** Coerce Prisma Decimal, string, or number values to a plain number. */
+export function toNumber(value: unknown): number {
+  if (value == null) return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') return parseFloat(value) || 0
+  if (typeof value === 'object' && value !== null) {
+    if ('toNumber' in value && typeof (value as { toNumber: () => number }).toNumber === 'function') {
+      return (value as { toNumber: () => number }).toNumber()
+    }
+    return parseFloat(String(value)) || 0
+  }
+  return parseFloat(String(value)) || 0
+}
+
+export function formatMoney(value: unknown, decimals = 2): string {
+  return toNumber(value).toFixed(decimals)
+}
+
 export function findBestMatch(userQuestion: string, registeredQuestions: { question: string; answer: string }[]) {
   // Convert user question to lowercase for better matching
   const userQuestionLower = userQuestion.toLowerCase().trim();
@@ -74,7 +92,10 @@ export function findBestMatch(userQuestion: string, registeredQuestions: { quest
     });
     
     // Consider it a match if score is above threshold
-    if (score > highestScore && score >= 2) { // Require at least 2 matching words
+    const hasStrongSingleWordMatch =
+      score >= 1 && words.some((word) => word.length >= 5 && questionLower.includes(word))
+
+    if (score > highestScore && (score >= 2 || hasStrongSingleWordMatch)) {
       highestScore = score;
       bestMatch = qa;
     }
@@ -90,6 +111,32 @@ export const STORAGE_KEYS = {
   REALTIME_MODE: 'realtime_mode'
 } as const;
 
+/** Keep chat history for 30 days in the browser. */
+const CHAT_STORAGE_TTL_HOURS = 24 * 30
+
+export function getChatStorageKey(domainId?: string | null): string {
+  return domainId ? `${STORAGE_KEYS.CHAT_MESSAGES}_${domainId}` : STORAGE_KEYS.CHAT_MESSAGES
+}
+
+export const CHATBOT_LOAD_ERROR_TEXT = 'Sorry, there was an error loading this chatbot'
+
+export function isStoredChatUsable(
+  messages: Array<{ role: string; content: string }> | undefined
+): boolean {
+  if (!messages?.length) return false
+
+  if (messages.some((message) => message.content?.includes(CHATBOT_LOAD_ERROR_TEXT))) {
+    return false
+  }
+
+  const firstMessage = messages[0]?.content || ''
+  if (firstMessage.includes('email address') && firstMessage.includes('live support')) {
+    return false
+  }
+
+  return true
+}
+
 // Save chat messages to local storage
 export const saveChatToStorage = (
   chatRoom: string,
@@ -101,9 +148,11 @@ export const saveChatToStorage = (
   isRealtime: boolean,
   supportAgent?: {
     name: string;
-  }
+  },
+  domainId?: string | null
 ) => {
   try {
+    const storageKey = getChatStorageKey(domainId)
     // Validate messages before saving
     if (!Array.isArray(messages)) {
       throw new Error('Messages must be an array');
@@ -130,7 +179,7 @@ export const saveChatToStorage = (
     };
 
     // Use a temporary key first
-    const tempKey = `${STORAGE_KEYS.CHAT_MESSAGES}_temp`;
+    const tempKey = `${storageKey}_temp`;
     localStorage.setItem(tempKey, JSON.stringify(storageData));
 
     // Verify the data was stored correctly
@@ -140,19 +189,19 @@ export const saveChatToStorage = (
     }
 
     // If verification passes, move to final key
-    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, verifyData);
+    localStorage.setItem(storageKey, verifyData);
     localStorage.removeItem(tempKey);
 
     // Store a backup with timestamp
     localStorage.setItem(
-      `${STORAGE_KEYS.CHAT_MESSAGES}_backup_${Date.now()}`,
+      `${storageKey}_backup_${Date.now()}`,
       verifyData
     );
   } catch (error) {
     console.error('Error saving chat to storage:', error);
     // Attempt to save to session storage as fallback
     try {
-      sessionStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify({
+      sessionStorage.setItem(storageKey, JSON.stringify({
         messages,
         chatRoom,
         isRealtime,
@@ -167,14 +216,20 @@ export const saveChatToStorage = (
 };
 
 // Load chat messages from local storage
-export const loadChatFromStorage = () => {
+export const loadChatFromStorage = (domainId?: string | null) => {
   try {
+    const storageKey = getChatStorageKey(domainId)
     // Try to load from main storage
-    const data = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
+    let data = localStorage.getItem(storageKey);
+
+    // Fall back to legacy global key for older sessions
+    if (!data && domainId) {
+      data = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES)
+    }
     
     // If main storage fails, try session storage
     if (!data) {
-      const sessionData = sessionStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
+      const sessionData = sessionStorage.getItem(storageKey);
       if (sessionData) {
         return JSON.parse(sessionData);
       }
@@ -193,12 +248,17 @@ export const loadChatFromStorage = () => {
     const storedTime = parsedData.timestamp;
     const hoursDiff = (now - storedTime) / (1000 * 60 * 60);
     
-    if (hoursDiff > 24) {
+    if (hoursDiff > CHAT_STORAGE_TTL_HOURS) {
       // Save to backup before clearing
       localStorage.setItem(
-        `${STORAGE_KEYS.CHAT_MESSAGES}_expired_${Date.now()}`,
+        `${storageKey}_expired_${Date.now()}`,
         data
       );
+      return null;
+    }
+
+    if (!isStoredChatUsable(parsedData.messages)) {
+      clearChatStorage(domainId);
       return null;
     }
 
@@ -210,9 +270,9 @@ export const loadChatFromStorage = () => {
 };
 
 // Clear chat storage
-export const clearChatStorage = () => {
+export const clearChatStorage = (domainId?: string | null) => {
   try {
-    localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
+    localStorage.removeItem(getChatStorageKey(domainId));
   } catch (error) {
     console.error('Error clearing chat storage:', error);
   }

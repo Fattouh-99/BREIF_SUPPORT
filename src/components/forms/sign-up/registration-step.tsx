@@ -293,7 +293,7 @@ const RegistrationFormStep = () => {
           console.log('Free plan - completing registration without payment');
           toast({
             title: "Creating your account",
-            description: "Setting up your dashboard...",
+            description: "Setting up your account...",
           });
           
           // Complete registration for free plan
@@ -427,11 +427,11 @@ const RegistrationFormStep = () => {
       console.log('Registration completed successfully');
       toast({
         title: "Success!",
-        description: "Account created successfully. Redirecting to dashboard...",
+        description: "Account created successfully. Redirecting to conversations...",
       });
       
       // Redirect to dashboard after successful registration
-      router.push('/dashboard');
+      router.push('/conversation');
       return true;
     } catch (error) {
       console.error("Registration error:", error);

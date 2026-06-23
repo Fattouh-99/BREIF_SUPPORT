@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Facebook, Twitter, Linkedin, Instagram, Mail, MapPin, Phone } from 'lucide-react'
+import { SUPPORT_EMAIL } from '@/constants/support'
 
 const Footer = () => {
   return (
@@ -90,11 +91,11 @@ const Footer = () => {
             <ul className="space-y-4">
               <li>
                 <a 
-                  href="mailto:support@briefsupport.com" 
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="flex items-center space-x-3 text-foreground/70 hover:text-primary transition-colors py-1"
                 >
                   <Mail className="w-5 h-5" />
-                  <span>support@briefsupport.com</span>
+                  <span>{SUPPORT_EMAIL}</span>
                 </a>
               </li>
             </ul>

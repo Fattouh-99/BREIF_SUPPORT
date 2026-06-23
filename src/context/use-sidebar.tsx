@@ -119,7 +119,6 @@ const useSideBar = () => {
     if (!pathname) return '';
     // Handle conversation routes specifically
     if (pathname.startsWith('/conversation')) return 'conversation';
-    if (pathname.startsWith('/dashboard')) return 'dashboard';
     // For other routes, get the last segment
     const segments = pathname.split('/').filter(Boolean);
     return segments.length > 0 ? segments[segments.length - 1] : '';

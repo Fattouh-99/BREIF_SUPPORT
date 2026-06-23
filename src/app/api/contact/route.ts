@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { rateLimit } from '@/lib/rate-limit'
+import { createMailTransporter, getMailFromAddress } from '@/lib/mailer'
+import { SUPPORT_EMAIL } from '@/constants/support'
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting: 5 contact messages per hour
@@ -28,21 +29,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create transporter using the same configuration as existing mailer
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.NODE_MAILER_EMAIL,
-        pass: process.env.NODE_MAILER_GMAIL_APP_PASSWORD,
-      },
-    })
+    const transporter = createMailTransporter()
 
     // Email to support inbox
     const supportMailOptions = {
-      from: process.env.NODE_MAILER_EMAIL,
-      to: 'support@briefsupport.com',
+      from: getMailFromAddress(),
+      to: getMailFromAddress(),
       subject: `New Contact Form Submission from ${company}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -95,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     // Confirmation email to the user
     const confirmationMailOptions = {
-      from: process.env.NODE_MAILER_EMAIL,
+      from: getMailFromAddress(),
       to: email,
       subject: 'Thank you for contacting Brief Support',
       html: `
@@ -145,7 +137,7 @@ export async function POST(request: NextRequest) {
           <p style="color: #666; font-size: 12px; text-align: center;">
             Best regards,<br>
             The Brief Support Team<br>
-            <a href="mailto:support@briefsupport.com" style="color: #007bff;">support@briefsupport.com</a>
+            <a href="mailto:${SUPPORT_EMAIL}" style="color: #007bff;">${SUPPORT_EMAIL}</a>
           </p>
         </div>
       `,

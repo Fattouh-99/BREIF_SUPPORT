@@ -13,7 +13,6 @@ import { Button } from '../ui/button'
 import { Send, X, Minus, ArrowLeft, Expand } from 'lucide-react'
 import Accordion from '../accordian'
 import { BotIconType } from '@/icons/bot-icons'
-import { clearChatStorage } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { onToggleRealtime } from '@/actions/conversation'
 import { pusherClient } from '@/lib/pusher'
@@ -48,6 +47,7 @@ type Props = {
   iconStyle: BotIconType
   onClose: () => void
   onMinimize: () => void
+  onStartNewChat?: () => void
   onExpand?: (isExpanded: boolean) => void
   inquiryMode?: boolean
   productsEnabled?: boolean
@@ -137,6 +137,7 @@ export const BotWindow = forwardRef<HTMLDivElement, Props>(
       bubbleBackground,
       onClose,
       onMinimize,
+      onStartNewChat,
       onExpand,
       inquiryMode = false,
       productsEnabled = true,
@@ -425,6 +426,7 @@ export const BotWindow = forwardRef<HTMLDivElement, Props>(
     }
 
     const handleStartChat = () => {
+      onStartNewChat?.()
       setActiveTab('chat')
       setIsChatActive(true)
     }
@@ -511,29 +513,15 @@ export const BotWindow = forwardRef<HTMLDivElement, Props>(
       // Wait for exit animation to complete
       await new Promise(resolve => setTimeout(resolve, 350));
       
-      // If in realtime mode, disable it
+      // If in realtime mode, disable it (history stays saved in local storage)
       if (realtimeMode?.mode && realtimeMode.chatroom) {
         await onToggleRealtime(
           realtimeMode.chatroom, 
           false,
-          { name: "Sefrid Kapllani", role: 'support' }
+          { name: 'Support Agent', role: 'support' }
         );
       }
 
-      // Reset chat state
-      const greetingMessage = chats[0]
-      if (greetingMessage && greetingMessage.role === 'assistant') {
-        setChat([greetingMessage])
-        localStorage.setItem('chat', JSON.stringify({
-          messages: [greetingMessage],
-          chatRoom: null,
-          isRealtime: false
-        }))
-      } else {
-        clearChatStorage()
-        setChat([])
-      }
-      
       onClose();
     }
 

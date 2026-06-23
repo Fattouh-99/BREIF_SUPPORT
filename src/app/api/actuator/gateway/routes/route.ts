@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
       status: 'ok',
       routes: [
         {
-          id: 'dashboard',
-          path: '/dashboard',
-          description: 'Main dashboard route'
+          id: 'conversation',
+          path: '/conversation',
+          description: 'Main conversations route'
         },
         {
           id: 'settings',

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Twitter, Github, Linkedin, Facebook, Instagram, Mail } from 'lucide-react';
 import { RevealOnScroll } from '@/components/motion/parallax-scroll';
+import { SUPPORT_EMAIL } from '@/constants/support';
 
 interface FooterLink {
   title: string;
@@ -57,7 +58,7 @@ const socialLinks = [
   { title: 'Twitter', href: 'https://twitter.com', icon: Twitter, external: true },
   { title: 'LinkedIn', href: 'https://linkedin.com', icon: Linkedin, external: true },
   { title: 'GitHub', href: 'https://github.com', icon: Github, external: true },
-  { title: 'Email', href: 'mailto:support@briefsupport.com', icon: Mail, external: true },
+  { title: 'Email', href: `mailto:${SUPPORT_EMAIL}`, icon: Mail, external: true },
 ];
 
 export function ModernFooter() {

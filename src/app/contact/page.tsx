@@ -9,6 +9,7 @@ import { Check, Mail } from 'lucide-react'
 import { LandingNavbar } from '@/components/navbar/landing-navbar';
 import Footer from '@/components/footer'
 import Link from 'next/link'
+import { SUPPORT_EMAIL } from '@/constants/support'
 
 export default function ContactPage() {
   const [formState, setFormState] = useState({
@@ -113,7 +114,7 @@ export default function ContactPage() {
                     <Mail className="w-5 h-5 mt-1 mr-3" />
                     <div>
                       <h3 className="font-medium">Email</h3>
-                      <p>support@briefsupport.com</p>
+                      <p>{SUPPORT_EMAIL}</p>
                     </div>
                   </div>
                 </div>

@@ -49,6 +49,22 @@ export async function GET(req: Request) {
       console.log(`[API DEBUG] Chat room not found: ${chatRoomId}`);
       return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
     }
+
+    const includeMessages = url.searchParams.get('includeMessages') === 'true'
+    const messages = includeMessages
+      ? await prisma.chatMessage.findMany({
+          where: { chatRoomId },
+          orderBy: { createdAt: 'asc' },
+          take: 100,
+          select: {
+            id: true,
+            message: true,
+            role: true,
+            createdAt: true,
+            seen: true,
+          },
+        })
+      : undefined
     
     // Format the response to include essential information
     const response = {
@@ -78,7 +94,8 @@ export async function GET(req: Request) {
         role: chatRoom.message[0].role,
         timestamp: chatRoom.message[0].createdAt
       } : null,
-      lastActivity: chatRoom.updatedAt
+      lastActivity: chatRoom.updatedAt,
+      ...(messages ? { messages } : {}),
     };
     
     console.log(`[API DEBUG] ✅ Retrieved status for chat room: ${chatRoomId}, live: ${response.live}`);

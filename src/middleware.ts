@@ -41,6 +41,8 @@ const ROUTE_CONFIG = {
     '/api/stripe/v2/create-payment-intent',
     '/api/contact',
     '/api/inquiries/test',
+    '/api/landing-chat',
+    '/api/notify/real-time',
   ],
   
   // Auth pages that authenticated users should be redirected from
@@ -51,7 +53,6 @@ const ROUTE_CONFIG = {
   
   // Protected routes that always require authentication
   PROTECTED_ROUTES: [
-    '/dashboard',
     '/conversation',
     '/team',
     '/settings',
@@ -106,14 +107,19 @@ export default authMiddleware({
       return NextResponse.next();
     }
     
+    // Redirect legacy dashboard route to conversations
+    if (pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/conversation', req.url), 301);
+    }
+
     // Handle authenticated users on auth pages - Fix for redirect loop
     if (userId && isAuthPage(pathname)) {
       console.log(`Authenticated user attempting to access auth page: ${pathname}`);
       // Don't redirect if coming from a previous redirect, prevent loop
-      if (req.headers.get('referer')?.includes('/dashboard')) {
+      if (req.headers.get('referer')?.includes('/conversation')) {
         return NextResponse.next();
       }
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      return NextResponse.redirect(new URL('/conversation', req.url));
     }
     
     // Handle 404 errors more explicitly to prevent soft 404s

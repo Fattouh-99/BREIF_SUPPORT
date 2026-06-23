@@ -47,7 +47,7 @@ const Page = async () => {
 
   // Redirect to dashboard if user's dashboard type is 'services'
   if (userData?.dashboard === 'services') {
-    redirect('/dashboard')
+    redirect('/conversation')
   }
 
   const bookingsData = await onGetAllBookingsForCurrentUser(user.id)
