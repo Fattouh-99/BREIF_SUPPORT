@@ -8298,6 +8298,10 @@ html[data-chatbot-frame="true"] [data-maintenance-banner] {
   background-color: rgb(63 63 70 / var(--tw-bg-opacity, 1));
 }
 
+.dark\:bg-indigo-950\/40:is(.dark *) {
+  background-color: rgb(30 27 75 / 0.4);
+}
+
 .dark\:from-amber-900\/20:is(.dark *) {
   --tw-gradient-from: rgb(120 53 15 / 0.2) var(--tw-gradient-from-position);
   --tw-gradient-to: rgb(120 53 15 / 0) var(--tw-gradient-to-position);

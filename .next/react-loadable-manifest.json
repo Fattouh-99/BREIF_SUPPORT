@@ -1,11 +1,4 @@
 {
-  "app/chatbot/page.tsx -> @/components/chatbot": {
-    "id": "app/chatbot/page.tsx -> @/components/chatbot",
-    "files": [
-      "static/css/_app-pages-browser_src_components_chatbot_index_tsx.css",
-      "static/chunks/_app-pages-browser_src_components_chatbot_index_tsx.js"
-    ]
-  },
   "components/conversations/conversation-client.tsx -> .": {
     "id": "components/conversations/conversation-client.tsx -> .",
     "files": [
@@ -22,18 +15,6 @@
     "id": "components/conversations/conversation-client.tsx -> ./messenger",
     "files": [
       "static/chunks/_app-pages-browser_src_components_conversations_messenger_tsx.js"
-    ]
-  },
-  "components/forms/settings/form.tsx -> ./greetings-message": {
-    "id": "components/forms/settings/form.tsx -> ./greetings-message",
-    "files": [
-      "static/chunks/_app-pages-browser_src_components_forms_settings_greetings-message_tsx.js"
-    ]
-  },
-  "components/products/lazy-product-form.tsx -> ./product-form": {
-    "id": "components/products/lazy-product-form.tsx -> ./product-form",
-    "files": [
-      "static/chunks/_app-pages-browser_src_components_products_product-form_tsx.js"
     ]
   },
   "components/upload-button/index.tsx -> lucide-react": {

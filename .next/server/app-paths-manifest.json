@@ -1,15 +1,6 @@
 {
-  "/chatbot/page": "app/chatbot/page.js",
   "/api/notifications/cleanup/route": "app/api/notifications/cleanup/route.js",
-  "/api/system-settings/route": "app/api/system-settings/route.js",
   "/api/notifications/route": "app/api/notifications/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/api/user/me/route": "app/api/user/me/route.js",
-  "/api/stripe/v2/subscriptions/route": "app/api/stripe/v2/subscriptions/route.js",
-  "/api/stripe/payment-history/route": "app/api/stripe/payment-history/route.js",
-  "/(dashboard)/email-marketing/page": "app/(dashboard)/email-marketing/page.js",
-  "/(dashboard)/conversation/page": "app/(dashboard)/conversation/page.js",
-  "/(dashboard)/settings/page": "app/(dashboard)/settings/page.js",
-  "/(dashboard)/settings/[domain]/page": "app/(dashboard)/settings/[domain]/page.js",
-  "/(dashboard)/team/page": "app/(dashboard)/team/page.js"
+  "/(dashboard)/conversation/page": "app/(dashboard)/conversation/page.js"
 }

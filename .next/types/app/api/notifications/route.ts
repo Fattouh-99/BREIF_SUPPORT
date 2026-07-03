@@ -1,4 +1,4 @@
-// File: /Users/fattouh999/Documents/GitHub/New-folder/src/app/api/notifications/route.ts
+// File: /Users/fattouh999/Documents/BREIF_SUPPORT/src/app/api/notifications/route.ts
 import * as entry from '../../../../../src/app/api/notifications/route.js'
 import type { NextRequest } from 'next/server.js'
 
