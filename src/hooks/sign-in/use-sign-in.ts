@@ -34,7 +34,7 @@ export const useSignInForm = () => {
   const searchParams = useSearchParams()
   
   // Get redirect URL from query params if available
-  const redirectUrl = searchParams?.get('redirect_url') || '/conversation'
+  const redirectUrl = searchParams?.get('redirect_url') || '/dashboard'
   
   // Memoize the form setup to avoid re-creating on every render
   const methods = useForm<UserLoginProps>({

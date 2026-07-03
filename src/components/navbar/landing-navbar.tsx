@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Moon, Sun, Menu, X } from 'lucide-react';
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 
 interface NavItem {
   name: string;
@@ -74,12 +75,19 @@ export function LandingNavbar() {
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
           
-          <Button asChild className="rounded-full">
-            <Link href="/auth/sign-up">Get Started</Link>
-          </Button>
-          <Button asChild variant="outline" className="rounded-full">
-            <Link href="/auth/sign-in">Log In</Link>
-          </Button>
+          <SignedIn>
+            <Button asChild className="rounded-full">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
+          </SignedIn>
+          <SignedOut>
+            <Button asChild className="rounded-full">
+              <Link href="/auth/sign-up">Get Started</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link href="/auth/sign-in">Log In</Link>
+            </Button>
+          </SignedOut>
         </div>
 
         {/* Mobile Navigation Toggle */}
@@ -128,12 +136,19 @@ export function LandingNavbar() {
                   {item.name}
                 </Link>
               ))}
-              <Button asChild className="mt-4 rounded-full" onClick={() => setMobileNavOpen(false)}>
-                <Link href="/auth/sign-up">Get Started</Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-full" onClick={() => setMobileNavOpen(false)}>
-                <Link href="/auth/sign-in">Log In</Link>
-              </Button>
+              <SignedIn>
+                <Button asChild className="mt-4 rounded-full" onClick={() => setMobileNavOpen(false)}>
+                  <Link href="/dashboard">Dashboard</Link>
+                </Button>
+              </SignedIn>
+              <SignedOut>
+                <Button asChild className="mt-4 rounded-full" onClick={() => setMobileNavOpen(false)}>
+                  <Link href="/auth/sign-up">Get Started</Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full" onClick={() => setMobileNavOpen(false)}>
+                  <Link href="/auth/sign-in">Log In</Link>
+                </Button>
+              </SignedOut>
             </div>
           </motion.div>
         )}

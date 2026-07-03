@@ -53,6 +53,7 @@ const ROUTE_CONFIG = {
   
   // Protected routes that always require authentication
   PROTECTED_ROUTES: [
+    '/dashboard',
     '/conversation',
     '/team',
     '/settings',
@@ -107,11 +108,7 @@ export default authMiddleware({
       return NextResponse.next();
     }
     
-    // Redirect legacy dashboard route to conversations
-    if (pathname === '/dashboard') {
-      return NextResponse.redirect(new URL('/conversation', req.url), 301);
-    }
-
+    // Legacy /dashboard now has its own analytics page (see app/(dashboard)/dashboard)
     // Handle authenticated users on auth pages - Fix for redirect loop
     if (userId && isAuthPage(pathname)) {
       console.log(`Authenticated user attempting to access auth page: ${pathname}`);
